@@ -1,17 +1,9 @@
+// models/Appointment.js
 const mongoose = require('mongoose');
 
 const appointmentSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  phone: { type: String, required: true },
-  telegram_user: { type: String },
-  service: { 
-    name: { type: String },
-    price: { type: Number },
-  },
-  date: { type: String, required: true },
-  time: { type: String, required: true },
-  receipt_url: { type: String, required: true }, // Cloudinary rasmining manzili
-  status: { type: String, default: 'pending' },
+  date: { type: String, required: true }, // "YYYY-MM-DD" yoki "DD.MM.YYYY" formatida
+  time: { type: String, required: true }, // "10:30" formatida
   createdAt: { type: Date, default: Date.now }
 });
 
