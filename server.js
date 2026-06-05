@@ -2,28 +2,39 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const multer = require('multer');
-const TelegramBot = require('node-telegram-bot-api');
+const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
 
+const User = require('./models/User');
 const Service = require('./models/Service');
-const Appointment = require('./models/Appointment');
+
+const authRoutes = require('./routes/auth');
+const appointmentRoutes = require('./routes/appointments');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
+// Create uploads/ folder if it doesn't exist
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('📂 Local storage directory "uploads/" created.');
+}
 
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ MongoDB muvaffaqiyatli ulandi'))
-  .catch(err => console.error('❌ MongoDB ulanishda xato:', err));
+// Serve uploaded files statically
+app.use('/uploads', express.static(uploadsDir));
 
-// Rasmni vaqtinchalik server (Render) xotirasida saqlab turish uchun multer sozlamasi
-const upload = multer({ dest: 'uploads/' }); 
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/admin', adminRoutes);
 
-// --- API ROUTELAR ---
-
+// Preserve original Service list endpoint
 app.get('/api/services', async (req, res) => {
   try {
     const services = await Service.find();
@@ -33,62 +44,38 @@ app.get('/api/services', async (req, res) => {
   }
 });
 
-// Ma'lum sanadagi band qilingan vaqtlarni olish (Frontendda vaqtlarni o'chirish uchun)
-app.get('/api/appointments/booked', async (req, res) => {
+// Admin User Seeding
+async function seedAdminUser() {
   try {
-    const { date } = req.query;
-    const appointments = await Appointment.find({ date });
-    const bookedTimes = appointments.map(app => app.time);
-    res.json(bookedTimes);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Yangi buyurtma yaratish
-app.post('/api/appointments', upload.single('receipt'), async (req, res) => {
-  try {
-    const { name, phone, telegram_user, serviceName, servicePrice, date, time } = req.body;
-    const file = req.file;
-
-    if (!file) {
-      return res.status(400).json({ error: "To'lov cheki yuklanmadi" });
+    const adminExists = await User.findOne({ role: 'admin' });
+    if (!adminExists) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash('admin', salt);
+      const adminUser = new User({
+        name: 'Alimardon (Admin)',
+        phone: '+998 99 999 99 99',
+        telegram: '',
+        password: hashedPassword,
+        role: 'admin',
+        status: 'active'
+      });
+      await adminUser.save();
+      console.log('👑 Admin user seeded successfully: +998 99 999 99 99 / admin');
+    } else {
+      console.log('👑 Admin user already exists.');
     }
-
-    // 1. Bazaga F AQAT sana va vaqtni saqlaymiz (Vaqtni band qilish uchun)
-    const newAppointment = new Appointment({ date, time });
-    await newAppointment.save();
-
-    // 2. Telegramga xabar va rasmni yuboramiz
-    const message = `
-🎉 *Yangi buyurtma va to'lov!*
-
-👤 *Mijoz:* ${name}
-📱 *Tel:* ${phone}
-✈️ *Tg user:* ${telegram_user || "Kiritilmagan"}
-
-💈 *Xizmat:* ${serviceName}
-💰 *Narxi:* ${servicePrice} so'm
-📅 *Sana:* ${date}
-🕐 *Vaqt:* ${time}
-    `;
-
-    // Multer rasmni uploads/ papkasiga saqlagan, uni bot orqali jo'natamiz
-    await bot.sendPhoto(process.env.TELEGRAM_CHAT_ID, file.path, { 
-      caption: message, 
-      parse_mode: 'Markdown' 
-    });
-
-    // 3. Telegramga jo'natib bo'lgach, joyni band qilmasligi uchun rasmni serverdan o'chirib yuboramiz
-    fs.unlinkSync(file.path); 
-
-    res.status(201).json({ message: 'Buyurtma qabul qilindi va vaqt band qilindi' });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Xatolik yuz berdi' });
+    console.error('❌ Error seeding admin user:', error.message);
   }
-});
+}
+
+// MongoDB connection
+mongoose.connect(process.env.MONGODB_URI)
+  .then(async () => {
+    console.log('✅ MongoDB muvaffaqiyatli ulandi');
+    await seedAdminUser();
+  })
+  .catch(err => console.error('❌ MongoDB ulanishda xato:', err));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server ${PORT}-portda ishlamoqda`));
