@@ -86,4 +86,15 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
   }
 });
 
+// 3. GET /api/appointments/my (Get logged-in user's appointments)
+router.get('/my', requireAuth, async (req, res) => {
+  try {
+    const appointments = await Appointment.find({ userId: req.user._id }).sort({ createdAt: -1 });
+    return res.json(appointments);
+  } catch (error) {
+    console.error('Get my appointments error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
 module.exports = router;
