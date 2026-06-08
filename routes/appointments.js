@@ -75,6 +75,19 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
     const photoSource = file.path.startsWith('http') ? file.path : file.path;
     await sendTelegramPhoto(photoSource, caption);
 
+    // Delete local receipt file after sending to Telegram to save server space
+    if (file.path && !file.path.startsWith('http')) {
+      const fs = require('fs');
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+          console.log('🗑️ Local receipt file deleted successfully after Telegram dispatch.');
+        }
+      } catch (err) {
+        console.error('Failed to delete local receipt file:', err);
+      }
+    }
+
     return res.status(201).json({
       message: 'Buyurtma muvaffaqiyatli yaratildi va tasdiqlashga yuborildi',
       appointment: newAppointment
