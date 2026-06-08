@@ -155,4 +155,46 @@ router.get('/me', requireAuth, async (req, res) => {
   }
 });
 
+// 4. PUT /api/auth/profile (Update Profile)
+router.put('/profile', requireAuth, async (req, res) => {
+  try {
+    const { name, telegram } = req.body;
+
+    if (!name || name.trim() === '') {
+      return res.status(400).json({ error: 'Ism kiritilishi majburiy' });
+    }
+
+    // Normalize telegram name (strip @ if present)
+    let cleanTelegram = telegram || '';
+    if (cleanTelegram.startsWith('@')) {
+      cleanTelegram = cleanTelegram.substring(1);
+    }
+    cleanTelegram = cleanTelegram.trim();
+
+    // Find and update user
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+    }
+
+    user.name = name.trim();
+    user.telegram = cleanTelegram;
+    
+    await user.save();
+
+    return res.json({
+      id: user._id,
+      name: user.name,
+      phone: user.phone,
+      telegram: user.telegram,
+      role: user.role,
+      status: user.status
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
 module.exports = router;
+
