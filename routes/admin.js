@@ -115,11 +115,6 @@ router.put('/bookings/:id', async (req, res) => {
 // 6. GET /api/admin/statistics (Financial & Business Stats)
 router.get('/statistics', async (req, res) => {
   try {
-    const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
     const users = await User.find({ role: 'user' });
     const totalUsers = users.length;
     const blockedUsers = users.filter(u => u.status === 'blocked').length;
@@ -130,17 +125,51 @@ router.get('/statistics', async (req, res) => {
     const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
     const confirmedBookingsCount = confirmedBookings.length;
 
-    // Revenue calculations (confirmed bookings only)
+    // Helper to parse "DD.MM.YYYY" to Date object
+    const parseBookingDate = (dateStr) => {
+      if (!dateStr) return new Date(0);
+      const parts = dateStr.split('.');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // 0-based month
+        const year = parseInt(parts[2], 10);
+        return new Date(year, month, day);
+      }
+      return new Date(0);
+    };
+
+    // Calculate dates normalized to midnight (start of day)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    // Revenue calculations (confirmed bookings only) based on booking date
     const dailyRevenue = confirmedBookings
-      .filter(b => b.createdAt >= oneDayAgo)
+      .filter(b => {
+        const bDate = parseBookingDate(b.date);
+        return bDate.toDateString() === today.toDateString();
+      })
       .reduce((sum, b) => sum + b.servicePrice, 0);
 
     const weeklyRevenue = confirmedBookings
-      .filter(b => b.createdAt >= sevenDaysAgo)
+      .filter(b => {
+        const bDate = parseBookingDate(b.date);
+        // Include bookings from 7 days ago until today
+        return bDate >= sevenDaysAgo && bDate <= today;
+      })
       .reduce((sum, b) => sum + b.servicePrice, 0);
 
     const monthlyRevenue = confirmedBookings
-      .filter(b => b.createdAt >= thirtyDaysAgo)
+      .filter(b => {
+        const bDate = parseBookingDate(b.date);
+        // Include bookings from 30 days ago until today
+        return bDate >= thirtyDaysAgo && bDate <= today;
+      })
       .reduce((sum, b) => sum + b.servicePrice, 0);
 
     const totalRevenue = confirmedBookings
