@@ -65,13 +65,6 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Initialize Gemini API
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      systemInstruction: systemInstruction,
-    });
-
     // Format history for Gemini chat if provided
     let geminiHistory = [];
     if (Array.isArray(history) && history.length > 0) {
@@ -89,16 +82,45 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Start chat session with history
-    const chat = model.startChat({
-      history: geminiHistory,
-      generationConfig: {
-        responseMimeType: 'application/json',
-      }
-    });
+    // Initialize Gemini API
+    const genAI = new GoogleGenerativeAI(apiKey);
+    let responseText;
 
-    const result = await chat.sendMessage(message);
-    const responseText = result.response.text();
+    try {
+      // Primary model: gemini-2.5-flash
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        systemInstruction: systemInstruction,
+      });
+
+      const chat = model.startChat({
+        history: geminiHistory,
+        generationConfig: {
+          responseMimeType: 'application/json',
+        }
+      });
+
+      const result = await chat.sendMessage(message);
+      responseText = result.response.text();
+    } catch (primaryError) {
+      console.warn('Primary model (gemini-2.5-flash) failed, retrying with gemini-2.0-flash...', primaryError.message);
+      
+      // Fallback model: gemini-2.0-flash (highly stable, widely available)
+      const fallbackModel = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        systemInstruction: systemInstruction,
+      });
+
+      const chat = fallbackModel.startChat({
+        history: geminiHistory,
+        generationConfig: {
+          responseMimeType: 'application/json',
+        }
+      });
+
+      const result = await chat.sendMessage(message);
+      responseText = result.response.text();
+    }
 
     // Parse the JSON response returned by the model
     try {
