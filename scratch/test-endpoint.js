@@ -5,7 +5,12 @@ async function run() {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ message: 'Salom' })
+      body: JSON.stringify({
+        message: 'Narxlar qalay?',
+        history: [
+          { sender: 'bot', text: 'Salom! Sizga qanday yordam bera olaman?' }
+        ]
+      })
     });
     const data = await res.json();
     console.log('API Response:', data);
