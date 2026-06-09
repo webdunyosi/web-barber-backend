@@ -79,7 +79,7 @@ router.post('/', async (req, res) => {
       text.includes('location') || 
       text.includes('adres')
     ) {
-      reply = "Bizning manzilimiz: **Toshkent shahri, Chilonzor tumani** (metro bekatlariga yaqin joylashgan).\n\nKeling, sizni kutib qolamiz! 💈";
+      reply = "Bizning manzilimiz: **Navoiy viloyati, Navoiy shahri, Mo'ljal: SUM ro'parasida**.\n\nKeling, sizni kutib qolamiz! 💈";
       action = "none";
     } else if (
       text.includes('ish vaqti') || 
