@@ -12,6 +12,7 @@ const Service = require('./models/Service');
 const authRoutes = require('./routes/auth');
 const appointmentRoutes = require('./routes/appointments');
 const adminRoutes = require('./routes/admin');
+const chatRoutes = require('./routes/chat');
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use('/uploads', express.static(uploadsDir));
 app.use('/api/auth', authRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Preserve original Service list endpoint
 app.get('/api/services', async (req, res) => {
