@@ -75,13 +75,18 @@ router.post('/', async (req, res) => {
     // Format history for Gemini chat if provided
     let geminiHistory = [];
     if (Array.isArray(history) && history.length > 0) {
-      geminiHistory = history
+      const mappedHistory = history
         .filter(msg => msg && msg.text) // filter valid messages
         .map(msg => ({
           role: msg.sender === 'user' ? 'user' : 'model',
           parts: [{ text: msg.text }]
-        }))
-        .slice(-10); // keep last 10 messages for context
+        }));
+
+      // Find the first message with role 'user' to comply with Gemini API validation
+      const firstUserIdx = mappedHistory.findIndex(msg => msg.role === 'user');
+      if (firstUserIdx !== -1) {
+        geminiHistory = mappedHistory.slice(firstUserIdx).slice(-10); // keep last 10 messages
+      }
     }
 
     // Start chat session with history
