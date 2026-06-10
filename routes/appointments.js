@@ -2,7 +2,7 @@ const express = require('express');
 const Appointment = require('../models/Appointment');
 const { requireAuth } = require('../middleware/auth');
 const { upload } = require('../config/storage');
-const { sendTelegramPhoto } = require('../utils/telegram');
+const { sendTelegramPhoto, sendTelegramMessage } = require('../utils/telegram');
 
 const router = express.Router();
 
@@ -32,21 +32,26 @@ router.get('/booked', async (req, res) => {
 // 2. POST /api/appointments (Create Booking)
 router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
   try {
-    const { name, phone, telegram_user, serviceName, servicePrice, date, time } = req.body;
+    const { name, phone, telegram_user, serviceName, servicePrice, date, time, paymentMethod } = req.body;
     const file = req.file;
 
     if (!name || !phone || !serviceName || !servicePrice || !date || !time) {
       return res.status(400).json({ error: 'Barcha maydonlar to\'ldirilishi shart' });
     }
 
-    if (!file) {
+    const isCash = paymentMethod === 'cash';
+
+    if (!isCash && !file) {
       return res.status(400).json({ error: 'To\'lov cheki yuklanishi shart' });
     }
 
-    // Determine the photo URL to save and send
-    const receiptUrl = file.path.startsWith('http')
-      ? file.path
-      : `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
+    // Determine the photo URL to save and send if card payment
+    let receiptUrl = '';
+    if (file) {
+      receiptUrl = file.path.startsWith('http')
+        ? file.path
+        : `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
+    }
 
     // Create and save new Appointment linked to user ID
     const newAppointment = new Appointment({
@@ -57,7 +62,8 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
       servicePrice: Number(servicePrice),
       date,
       time,
-      receipt: receiptUrl,
+      paymentMethod: paymentMethod || 'card',
+      receipt: receiptUrl || undefined,
       userId: req.user._id
     });
 
@@ -67,24 +73,32 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
     const priceFormatted = Number(servicePrice).toLocaleString('uz-UZ');
     const cleanTelegram = telegram_user ? telegram_user.replace(/^@/, '') : '';
     const telegramDisplay = cleanTelegram ? `@${cleanTelegram}` : 'mavjud emas';
+    const methodDisplay = isCash ? '💵 Sartaroshga (Joyida)' : '💳 Karta orqali (Online)';
 
-    const caption = `🧾 *Yangi To'lov & Buyurtma!*\n\n👤 *Mijoz:* ${name}\n📱 *Telefon:* ${phone}\n📱 *Telegram:* ${telegramDisplay}\n\n💈 *Xizmat:* ${serviceName}\n💰 *Narx:* ${priceFormatted} so'm\n📅 *Sana:* ${date}\n🕐 *Vaqt:* ${time}\n\n⚠️ _To'lov chekini tasdiqlash uchun admin panelga kiring!_`;
+    const caption = `🧾 *Yangi Buyurtma & To'lov!*\n\n👤 *Mijoz:* ${name}\n📱 *Telefon:* ${phone}\n📱 *Telegram:* ${telegramDisplay}\n💳 *To'lov usuli:* ${methodDisplay}\n\n💈 *Xizmat:* ${serviceName}\n💰 *Narx:* ${priceFormatted} so'm\n📅 *Sana:* ${date}\n🕐 *Vaqt:* ${time}\n\n` + 
+      (isCash 
+        ? `✅ _Joyida to'lash tanlandi. Tasdiqlash uchun admin panelga kiring!_`
+        : `⚠️ _To'lov chekini tasdiqlash uchun admin panelga kiring!_`);
 
-    // Send Telegram photo (using local file path if local fallback, URL if Cloudinary)
-    // Note: bot.sendPhoto supports file path stream for local files and URL strings for remote files.
-    const photoSource = file.path.startsWith('http') ? file.path : file.path;
-    await sendTelegramPhoto(photoSource, caption);
+    if (isCash || !file) {
+      // Send plain text message if cash payment (no receipt photo)
+      await sendTelegramMessage(caption);
+    } else {
+      // Send Telegram photo
+      const photoSource = file.path.startsWith('http') ? file.path : file.path;
+      await sendTelegramPhoto(photoSource, caption);
 
-    // Delete local receipt file after sending to Telegram to save server space
-    if (file.path && !file.path.startsWith('http')) {
-      const fs = require('fs');
-      try {
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-          console.log('🗑️ Local receipt file deleted successfully after Telegram dispatch.');
+      // Delete local receipt file after sending to Telegram to save server space
+      if (file.path && !file.path.startsWith('http')) {
+        const fs = require('fs');
+        try {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+            console.log('🗑️ Local receipt file deleted successfully after Telegram dispatch.');
+          }
+        } catch (err) {
+          console.error('Failed to delete local receipt file:', err);
         }
-      } catch (err) {
-        console.error('Failed to delete local receipt file:', err);
       }
     }
 

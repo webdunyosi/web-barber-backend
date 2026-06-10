@@ -9,7 +9,8 @@ const AppointmentSchema = new mongoose.Schema({
   date: { type: String, required: true }, // Format: "DD.MM.YYYY" (e.g. "06.06.2026")
   time: { type: String, required: true }, // Format: "HH:MM" (e.g. "11:30")
   status: { type: String, enum: ['pending', 'confirmed', 'rejected'], default: 'pending' },
-  receipt: { type: String, required: true }, // Cloudinary URL to payment check image
+  paymentMethod: { type: String, enum: ['card', 'cash'], default: 'card' },
+  receipt: { type: String, required: false }, // Cloudinary URL to payment check image (optional for cash)
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });
 
