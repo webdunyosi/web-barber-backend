@@ -60,11 +60,14 @@ router.delete('/users/:id', async (req, res) => {
       return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
     }
 
+    // Delete all bookings associated with this user
+    await Appointment.deleteMany({ userId: id });
+
     // Send Telegram Notification
-    const telegramMsg = `🗑 *Foydalanuvchi o'chirildi!*\n\n👤 *Ismi:* ${user.name}\n📱 *Telefon:* ${user.phone}`;
+    const telegramMsg = `🗑 *Foydalanuvchi o'chirildi!*\n\n👤 *Ismi:* ${user.name}\n📱 *Telefon:* ${user.phone}\n📅 *Status:* Barcha buyurtmalari ham o'chirildi`;
     await sendTelegramMessage(telegramMsg);
 
-    return res.json({ message: 'Foydalanuvchi muvaffaqiyatli o\'chirildi' });
+    return res.json({ message: 'Foydalanuvchi va uning buyurtmalari muvaffaqiyatli o\'chirildi' });
 
   } catch (error) {
     console.error('Delete user error:', error);
@@ -109,6 +112,28 @@ router.put('/bookings/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Update booking status error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// DELETE /api/admin/bookings/:id (Delete Booking)
+router.delete('/bookings/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const booking = await Appointment.findByIdAndDelete(id);
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Buyurtma topilmadi' });
+    }
+
+    // Send Telegram Notification
+    const telegramMsg = `🗑 *Buyurtma o'chirildi!*\n\n👤 *Mijoz:* ${booking.name}\n📱 *Telefon:* ${booking.phone}\n💈 *Xizmat:* ${booking.serviceName}\n📅 *Sana/Vaqt:* ${booking.date} soat ${booking.time}`;
+    await sendTelegramMessage(telegramMsg);
+
+    return res.json({ message: 'Buyurtma muvaffaqiyatli o\'chirildi' });
+
+  } catch (error) {
+    console.error('Delete booking error:', error);
     return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
   }
 });
