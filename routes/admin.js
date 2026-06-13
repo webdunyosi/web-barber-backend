@@ -1,6 +1,7 @@
 const express = require('express');
 const User = require('../models/User');
 const Appointment = require('../models/Appointment');
+const OfflineIncome = require('../models/OfflineIncome');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendTelegramMessage } = require('../utils/telegram');
 
@@ -112,6 +113,44 @@ router.put('/bookings/:id', async (req, res) => {
   }
 });
 
+// GET /api/admin/offline-income/:date (Get offline income for a date)
+router.get('/offline-income/:date', async (req, res) => {
+  try {
+    const { date } = req.params; // Format: "DD.MM.YYYY"
+    const doc = await OfflineIncome.findOne({ date });
+    return res.json({ date, amount: doc ? doc.amount : 0 });
+  } catch (error) {
+    console.error('Get offline income error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// POST /api/admin/offline-income (Set/Update offline income for a date)
+router.post('/offline-income', async (req, res) => {
+  try {
+    const { date, amount } = req.body; // e.g. date: "06.06.2026", amount: 150000
+    if (!date || amount === undefined) {
+      return res.status(400).json({ error: 'Sana va miqdor majburiy' });
+    }
+
+    const numericAmount = Number(amount);
+    if (isNaN(numericAmount) || numericAmount < 0) {
+      return res.status(400).json({ error: 'Noto\'g\'ri miqdor kiritildi' });
+    }
+
+    const doc = await OfflineIncome.findOneAndUpdate(
+      { date },
+      { amount: numericAmount },
+      { new: true, upsert: true }
+    );
+
+    return res.json({ message: 'Kassa muvaffaqiyatli saqlandi', offlineIncome: doc });
+  } catch (error) {
+    console.error('Set offline income error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
 // 6. GET /api/admin/statistics (Financial & Business Stats)
 router.get('/statistics', async (req, res) => {
   try {
@@ -124,6 +163,8 @@ router.get('/statistics', async (req, res) => {
     const pendingBookings = bookings.filter(b => b.status === 'pending').length;
     const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
     const confirmedBookingsCount = confirmedBookings.length;
+
+    const offlineIncomes = await OfflineIncome.find();
 
     // Helper to parse "DD.MM.YYYY" to Date object
     const parseBookingDate = (dateStr) => {
@@ -148,15 +189,15 @@ router.get('/statistics', async (req, res) => {
     const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(today.getDate() - 30);
 
-    // Revenue calculations (confirmed bookings only) based on booking date
-    const dailyRevenue = confirmedBookings
+    // Online Revenue calculations (confirmed bookings only) based on booking date
+    const onlineDailyRevenue = confirmedBookings
       .filter(b => {
         const bDate = parseBookingDate(b.date);
         return bDate.toDateString() === today.toDateString();
       })
       .reduce((sum, b) => sum + b.servicePrice, 0);
 
-    const weeklyRevenue = confirmedBookings
+    const onlineWeeklyRevenue = confirmedBookings
       .filter(b => {
         const bDate = parseBookingDate(b.date);
         // Include bookings from 7 days ago until today
@@ -164,7 +205,7 @@ router.get('/statistics', async (req, res) => {
       })
       .reduce((sum, b) => sum + b.servicePrice, 0);
 
-    const monthlyRevenue = confirmedBookings
+    const onlineMonthlyRevenue = confirmedBookings
       .filter(b => {
         const bDate = parseBookingDate(b.date);
         // Include bookings from 30 days ago until today
@@ -172,8 +213,33 @@ router.get('/statistics', async (req, res) => {
       })
       .reduce((sum, b) => sum + b.servicePrice, 0);
 
-    const totalRevenue = confirmedBookings
+    const onlineTotalRevenue = confirmedBookings
       .reduce((sum, b) => sum + b.servicePrice, 0);
+
+    // Offline Revenue calculations
+    const offlineDailyRevenue = offlineIncomes
+      .filter(o => {
+        const oDate = parseBookingDate(o.date);
+        return oDate.toDateString() === today.toDateString();
+      })
+      .reduce((sum, o) => sum + o.amount, 0);
+
+    const offlineWeeklyRevenue = offlineIncomes
+      .filter(o => {
+        const oDate = parseBookingDate(o.date);
+        return oDate >= sevenDaysAgo && oDate <= today;
+      })
+      .reduce((sum, o) => sum + o.amount, 0);
+
+    const offlineMonthlyRevenue = offlineIncomes
+      .filter(o => {
+        const oDate = parseBookingDate(o.date);
+        return oDate >= thirtyDaysAgo && oDate <= today;
+      })
+      .reduce((sum, o) => sum + o.amount, 0);
+
+    const offlineTotalRevenue = offlineIncomes
+      .reduce((sum, o) => sum + o.amount, 0);
 
     // Popular services: group, count, aggregate confirmed revenue, sort descending by count
     const serviceMap = {};
@@ -207,23 +273,41 @@ router.get('/statistics', async (req, res) => {
       // label: e.g. "Jum 05.06"
       const dayLabel = `${dayNamesUz[d.getDay()]} ${dayStr}.${monthStr}`;
 
-      // Sum confirmed revenue for this date string
-      const value = confirmedBookings
+      // Sum confirmed online revenue for this date string
+      const onlineValue = confirmedBookings
         .filter(b => b.date === dbDateString)
         .reduce((sum, b) => sum + b.servicePrice, 0);
 
+      // Sum offline revenue for this date string
+      const offlineDoc = offlineIncomes.find(o => o.date === dbDateString);
+      const offlineValue = offlineDoc ? offlineDoc.amount : 0;
+
       chartData.push({
         label: dayLabel,
-        value: value
+        value: onlineValue + offlineValue,
+        onlineValue: onlineValue,
+        offlineValue: offlineValue
       });
     }
 
     return res.json({
       revenues: {
-        daily: dailyRevenue,
-        weekly: weeklyRevenue,
-        monthly: monthlyRevenue,
-        total: totalRevenue
+        daily: onlineDailyRevenue + offlineDailyRevenue,
+        weekly: onlineWeeklyRevenue + offlineWeeklyRevenue,
+        monthly: onlineMonthlyRevenue + offlineMonthlyRevenue,
+        total: onlineTotalRevenue + offlineTotalRevenue
+      },
+      onlineRevenues: {
+        daily: onlineDailyRevenue,
+        weekly: onlineWeeklyRevenue,
+        monthly: onlineMonthlyRevenue,
+        total: onlineTotalRevenue
+      },
+      offlineRevenues: {
+        daily: offlineDailyRevenue,
+        weekly: offlineWeeklyRevenue,
+        monthly: offlineMonthlyRevenue,
+        total: offlineTotalRevenue
       },
       counts: {
         totalUsers,
