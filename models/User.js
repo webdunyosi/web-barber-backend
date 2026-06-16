@@ -6,7 +6,8 @@ const UserSchema = new mongoose.Schema({
   telegram: { type: String, default: '' }, // e.g. "jasur_ali" without '@'
   password: { type: String, required: true }, // Hashed using bcrypt
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
-  status: { type: String, enum: ['active', 'blocked'], default: 'active' }
+  status: { type: String, enum: ['active', 'blocked'], default: 'active' },
+  loyaltyStamps: { type: Number, default: 0, min: 0, max: 9 }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);

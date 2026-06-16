@@ -79,7 +79,7 @@ router.delete('/users/:id', async (req, res) => {
 router.get('/bookings', async (req, res) => {
   try {
     const bookings = await Appointment.find()
-      .populate('userId', 'name phone telegram role status')
+      .populate('userId', 'name phone telegram role status loyaltyStamps')
       .sort({ createdAt: -1 });
     return res.json(bookings);
   } catch (error) {
@@ -98,10 +98,37 @@ router.put('/bookings/:id', async (req, res) => {
       return res.status(400).json({ error: 'Yaroqsiz holat. Faqat "confirmed" yoki "rejected" bo\'lishi mumkin' });
     }
 
-    const booking = await Appointment.findByIdAndUpdate(id, { status }, { new: true });
+    const booking = await Appointment.findById(id);
 
     if (!booking) {
       return res.status(404).json({ error: 'Buyurtma topilmadi' });
+    }
+
+    const previousStatus = booking.status;
+    booking.status = status;
+    await booking.save();
+
+    // Loyalty program stamp management
+    if (status === 'confirmed' && previousStatus !== 'confirmed') {
+      const user = await User.findById(booking.userId);
+      if (user && user.role === 'user') {
+        if (booking.isFree) {
+          user.loyaltyStamps = 0; // 10th free visit completed, reset to 0
+        } else {
+          user.loyaltyStamps = Math.min((user.loyaltyStamps || 0) + 1, 9);
+        }
+        await user.save();
+      }
+    } else if (status !== 'confirmed' && previousStatus === 'confirmed') {
+      const user = await User.findById(booking.userId);
+      if (user && user.role === 'user') {
+        if (booking.isFree) {
+          user.loyaltyStamps = 9; // free visit cancelled/rejected, restore to 9 stamps
+        } else {
+          user.loyaltyStamps = Math.max((user.loyaltyStamps || 0) - 1, 0);
+        }
+        await user.save();
+      }
     }
 
     // Send Telegram Notification
@@ -120,11 +147,26 @@ router.put('/bookings/:id', async (req, res) => {
 router.delete('/bookings/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const booking = await Appointment.findByIdAndDelete(id);
+    const booking = await Appointment.findById(id);
 
     if (!booking) {
       return res.status(404).json({ error: 'Buyurtma topilmadi' });
     }
+
+    // If deleting a confirmed booking, revert the stamp/points
+    if (booking.status === 'confirmed') {
+      const user = await User.findById(booking.userId);
+      if (user && user.role === 'user') {
+        if (booking.isFree) {
+          user.loyaltyStamps = 9;
+        } else {
+          user.loyaltyStamps = Math.max((user.loyaltyStamps || 0) - 1, 0);
+        }
+        await user.save();
+      }
+    }
+
+    await Appointment.findByIdAndDelete(id);
 
     // Send Telegram Notification
     const telegramMsg = `🗑 *Buyurtma o'chirildi!*\n\n👤 *Mijoz:* ${booking.name}\n📱 *Telefon:* ${booking.phone}\n💈 *Xizmat:* ${booking.serviceName}\n📅 *Sana/Vaqt:* ${booking.date} soat ${booking.time}`;

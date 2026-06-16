@@ -79,7 +79,8 @@ router.post('/register', async (req, res) => {
         phone: newUser.phone,
         telegram: newUser.telegram,
         role: newUser.role,
-        status: newUser.status
+        status: newUser.status,
+        loyaltyStamps: newUser.loyaltyStamps
       }
     });
 
@@ -127,7 +128,8 @@ router.post('/login', async (req, res) => {
         phone: user.phone,
         telegram: user.telegram,
         role: user.role,
-        status: user.status
+        status: user.status,
+        loyaltyStamps: user.loyaltyStamps
       }
     });
 
@@ -147,7 +149,8 @@ router.get('/me', requireAuth, async (req, res) => {
       phone: req.user.phone,
       telegram: req.user.telegram,
       role: req.user.role,
-      status: req.user.status
+      status: req.user.status,
+      loyaltyStamps: req.user.loyaltyStamps
     });
   } catch (error) {
     console.error('Get profile error:', error);
@@ -188,7 +191,8 @@ router.put('/profile', requireAuth, async (req, res) => {
       phone: user.phone,
       telegram: user.telegram,
       role: user.role,
-      status: user.status
+      status: user.status,
+      loyaltyStamps: user.loyaltyStamps
     });
   } catch (error) {
     console.error('Update profile error:', error);

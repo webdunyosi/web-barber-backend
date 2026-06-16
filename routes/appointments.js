@@ -1,5 +1,6 @@
 const express = require('express');
 const Appointment = require('../models/Appointment');
+const User = require('../models/User');
 const { requireAuth } = require('../middleware/auth');
 const { upload } = require('../config/storage');
 const { sendTelegramPhoto, sendTelegramMessage } = require('../utils/telegram');
@@ -39,7 +40,9 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
       return res.status(400).json({ error: 'Barcha maydonlar to\'ldirilishi shart' });
     }
 
-    const isCash = paymentMethod === 'cash';
+    const user = await User.findById(req.user._id);
+    const isFree = user && user.loyaltyStamps === 9;
+    const isCash = paymentMethod === 'cash' || isFree;
 
     if (!isCash && !file) {
       return res.status(400).json({ error: 'To\'lov cheki yuklanishi shart' });
@@ -59,26 +62,34 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
       phone,
       telegram_user: telegram_user ? telegram_user.replace(/^@/, '') : '',
       serviceName,
-      servicePrice: Number(servicePrice),
+      servicePrice: isFree ? 0 : Number(servicePrice),
       date,
       time,
-      paymentMethod: paymentMethod || 'card',
+      paymentMethod: isFree ? 'cash' : (paymentMethod || 'card'),
       receipt: receiptUrl || undefined,
-      userId: req.user._id
+      userId: req.user._id,
+      isFree: isFree
     });
 
     await newAppointment.save();
 
     // Prepare message caption for Telegram notification
-    const priceFormatted = Number(servicePrice).toLocaleString('uz-UZ');
+    const finalPrice = isFree ? 0 : Number(servicePrice);
+    const priceFormatted = finalPrice.toLocaleString('uz-UZ');
     const cleanTelegram = telegram_user ? telegram_user.replace(/^@/, '') : '';
     const telegramDisplay = cleanTelegram ? `@${cleanTelegram}` : 'mavjud emas';
-    const methodDisplay = isCash ? '💵 Sartaroshga (Joyida)' : '💳 Karta orqali (Online)';
+    
+    let methodDisplay = isCash ? '💵 Sartaroshga (Joyida)' : '💳 Karta orqali (Online)';
+    if (isFree) {
+      methodDisplay = '🎁 Bepul (Loyalty Card)';
+    }
 
-    const caption = `🧾 *Yangi Buyurtma & To'lov!*\n\n👤 *Mijoz:* ${name}\n📱 *Telefon:* ${phone}\n📱 *Telegram:* ${telegramDisplay}\n💳 *To'lov usuli:* ${methodDisplay}\n\n💈 *Xizmat:* ${serviceName}\n💰 *Narx:* ${priceFormatted} so'm\n📅 *Sana:* ${date}\n🕐 *Vaqt:* ${time}\n\n` + 
-      (isCash 
-        ? `✅ _Joyida to'lash tanlandi. Tasdiqlash uchun admin panelga kiring!_`
-        : `⚠️ _To'lov chekini tasdiqlash uchun admin panelga kiring!_`);
+    const caption = `🧾 *Yangi Buyurtma & To'lov!*\n\n👤 *Mijoz:* ${name}\n📱 *Telefon:* ${phone}\n📱 *Telegram:* ${telegramDisplay}\n💳 *To'lov usuli:* ${methodDisplay}\n\n💈 *Xizmat:* ${serviceName}\n💰 *Narx:* ${isFree ? 'BEPUL 🎁' : priceFormatted + ' so\'m'}\n📅 *Sana:* ${date}\n🕐 *Vaqt:* ${time}\n\n` + 
+      (isFree
+        ? `✅ _Loyalty Card orqali 10-bepul xizmat! Tasdiqlash uchun admin panelga kiring!_`
+        : (isCash 
+            ? `✅ _Joyida to'lash tanlandi. Tasdiqlash uchun admin panelga kiring!_`
+            : `⚠️ _To'lov chekini tasdiqlash uchun admin panelga kiring!_`));
 
     if (isCash || !file) {
       // Send plain text message if cash payment (no receipt photo)
