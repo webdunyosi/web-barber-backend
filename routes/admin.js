@@ -75,6 +75,68 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
+// PUT /api/admin/users/:id (Update/Edit User details)
+router.put('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, phone, telegram, loyaltyStamps, role, status } = req.body;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+    }
+
+    // Check phone number uniqueness if it's changing
+    if (phone && phone !== user.phone) {
+      const existingUser = await User.findOne({ phone });
+      if (existingUser) {
+        return res.status(400).json({ error: 'Bu telefon raqamli foydalanuvchi allaqachon mavjud' });
+      }
+      user.phone = phone;
+    }
+
+    if (name !== undefined) user.name = name;
+    
+    if (telegram !== undefined) {
+      // Strip @ if present
+      let cleanTelegram = telegram.trim();
+      if (cleanTelegram.startsWith('@')) {
+        cleanTelegram = cleanTelegram.substring(1);
+      }
+      user.telegram = cleanTelegram;
+    }
+    
+    if (loyaltyStamps !== undefined) {
+      const stamps = Number(loyaltyStamps);
+      if (!isNaN(stamps) && stamps >= 0 && stamps <= 9) {
+        user.loyaltyStamps = stamps;
+      } else {
+        return res.status(400).json({ error: 'Loyalty markalari 0 va 9 oralig\'ida bo\'lishi lozim' });
+      }
+    }
+
+    if (role !== undefined && ['user', 'admin'].includes(role)) {
+      user.role = role;
+    }
+
+    if (status !== undefined && ['active', 'blocked'].includes(status)) {
+      user.status = status;
+    }
+
+    await user.save();
+
+    // Send Telegram Notification
+    const telegramMsg = `📝 *Foydalanuvchi ma'lumotlari tahrirlandi!*\n\n👤 *Foydalanuvchi:* ${user.name}\n📱 *Telefon:* ${user.phone}\n✈️ *Telegram:* @${user.telegram || '-'}\n🏅 *Sodiqlik markalari:* ${user.loyaltyStamps || 0}\n🛑 *Holati:* ${user.status === 'blocked' ? 'Bloklangan 🚫' : 'Faol ✅'}\n🔑 *Roli:* ${user.role}`;
+    await sendTelegramMessage(telegramMsg);
+
+    return res.json({ message: 'Foydalanuvchi muvaffaqiyatli tahrirlandi', user });
+
+  } catch (error) {
+    console.error('Edit user error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
 // 4. GET /api/admin/bookings (List Bookings)
 router.get('/bookings', async (req, res) => {
   try {
