@@ -4,6 +4,7 @@ const Appointment = require('../models/Appointment');
 const OfflineIncome = require('../models/OfflineIncome');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendTelegramMessage } = require('../utils/telegram');
+const bcrypt = require('bcryptjs');
 
 const router = express.Router();
 
@@ -79,7 +80,7 @@ router.delete('/users/:id', async (req, res) => {
 router.put('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone, telegram, loyaltyStamps, role, status } = req.body;
+    const { name, phone, telegram, loyaltyStamps, role, status, password } = req.body;
 
     const user = await User.findById(id);
     if (!user) {
@@ -121,6 +122,11 @@ router.put('/users/:id', async (req, res) => {
 
     if (status !== undefined && ['active', 'blocked'].includes(status)) {
       user.status = status;
+    }
+
+    if (password && password.trim() !== '') {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password, salt);
     }
 
     await user.save();
