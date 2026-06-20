@@ -22,6 +22,72 @@ router.get('/users', async (req, res) => {
   }
 });
 
+// 1b. POST /api/admin/users (Create a new user/client)
+router.post('/users', async (req, res) => {
+  try {
+    const { name, phone, telegram, loyaltyStamps, status, role, password } = req.body;
+
+    if (!name || !phone || !password) {
+      return res.status(400).json({ error: 'Ism, telefon raqami va parol majburiy' });
+    }
+
+    // Normalize Uzbek phone number
+    const digits = phone.replace(/[^\d]/g, '');
+    let cleanDigits = digits;
+    if (digits.length === 9) {
+      cleanDigits = '998' + digits;
+    }
+    let formattedPhone = phone;
+    if (cleanDigits.length === 12 && cleanDigits.startsWith('998')) {
+      formattedPhone = `+998 ${cleanDigits.slice(3, 5)} ${cleanDigits.slice(5, 8)} ${cleanDigits.slice(8, 10)} ${cleanDigits.slice(10, 12)}`;
+    }
+
+    // Verify unique phone
+    const existingUser = await User.findOne({ phone: formattedPhone });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Bu telefon raqami allaqachon ro\'yxatdan o\'tgan' });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Normalize telegram name
+    let cleanTelegram = telegram || '';
+    if (cleanTelegram.startsWith('@')) {
+      cleanTelegram = cleanTelegram.substring(1);
+    }
+    cleanTelegram = cleanTelegram.trim();
+
+    // Create user
+    const newUser = new User({
+      name: name.trim(),
+      phone: formattedPhone,
+      telegram: cleanTelegram,
+      loyaltyStamps: loyaltyStamps || 0,
+      status: status || 'active',
+      role: role || 'user',
+      password: hashedPassword
+    });
+
+    await newUser.save();
+
+    return res.status(201).json({
+      id: newUser._id,
+      name: newUser.name,
+      phone: newUser.phone,
+      telegram: newUser.telegram,
+      role: newUser.role,
+      status: newUser.status,
+      loyaltyStamps: newUser.loyaltyStamps
+    });
+
+  } catch (error) {
+    console.error('Create user error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
 // 2. PUT /api/admin/users/:id/block (Block/Unblock User)
 router.put('/users/:id/block', async (req, res) => {
   try {
