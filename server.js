@@ -81,5 +81,6 @@ mongoose.connect(process.env.MONGODB_URI)
   })
   .catch(err => console.error('❌ MongoDB ulanishda xato:', err));
 
+// App listen port configuration
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server ${PORT}-portda ishlamoqda`));
