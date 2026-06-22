@@ -5,6 +5,7 @@ const OfflineIncome = require('../models/OfflineIncome');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendTelegramMessage } = require('../utils/telegram');
 const bcrypt = require('bcryptjs');
+const BlockedSchedule = require('../models/BlockedSchedule');
 
 const router = express.Router();
 
@@ -523,6 +524,50 @@ router.get('/statistics', async (req, res) => {
 
   } catch (error) {
     console.error('Get statistics error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// GET /api/admin/blocked-schedules (List all blocked dates/slots)
+router.get('/blocked-schedules', async (req, res) => {
+  try {
+    const schedules = await BlockedSchedule.find().sort({ createdAt: -1 });
+    return res.json(schedules);
+  } catch (error) {
+    console.error('List blocked schedules error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// POST /api/admin/blocked-schedules (Create or update blocked times for a date)
+router.post('/blocked-schedules', async (req, res) => {
+  try {
+    const { date, blockedTimes, reason } = req.body;
+    if (!date || !blockedTimes) {
+      return res.status(400).json({ error: 'Sana va blocklangan vaqtlar majburiy' });
+    }
+
+    const schedule = await BlockedSchedule.findOneAndUpdate(
+      { date },
+      { blockedTimes, reason: reason || '' },
+      { new: true, upsert: true }
+    );
+
+    return res.json({ message: 'Ish grafigi muvaffaqiyatli saqlandi', schedule });
+  } catch (error) {
+    console.error('Save blocked schedule error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// DELETE /api/admin/blocked-schedules/by-date/:date (Remove blocking for a date)
+router.delete('/blocked-schedules/by-date/:date', async (req, res) => {
+  try {
+    const { date } = req.params; // e.g. "06.06.2026"
+    await BlockedSchedule.findOneAndDelete({ date });
+    return res.json({ message: 'Sana blokdan chiqarildi' });
+  } catch (error) {
+    console.error('Delete blocked schedule error:', error);
     return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
   }
 });

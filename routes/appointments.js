@@ -1,6 +1,7 @@
 const express = require('express');
 const Appointment = require('../models/Appointment');
 const User = require('../models/User');
+const BlockedSchedule = require('../models/BlockedSchedule');
 const { requireAuth } = require('../middleware/auth');
 const { upload } = require('../config/storage');
 const { sendTelegramPhoto, sendTelegramMessage } = require('../utils/telegram');
@@ -22,10 +23,45 @@ router.get('/booked', async (req, res) => {
     });
 
     const bookedTimes = appointments.map(app => app.time);
+
+    // Fetch blocked times for this date from BlockedSchedule
+    const blockedDoc = await BlockedSchedule.findOne({ date });
+    if (blockedDoc) {
+      if (blockedDoc.blockedTimes.includes('ALL')) {
+        // If ALL slots are blocked, return all possible slots as booked
+        const allPossibleSlots = [
+          "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", 
+          "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", 
+          "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", 
+          "18:00", "18:30"
+        ];
+        return res.json(allPossibleSlots);
+      } else {
+        // Merge specific blocked slots
+        blockedDoc.blockedTimes.forEach(time => {
+          if (!bookedTimes.includes(time)) {
+            bookedTimes.push(time);
+          }
+        });
+      }
+    }
+
     return res.json(bookedTimes);
 
   } catch (error) {
     console.error('Get booked slots error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// 1b. GET /api/appointments/blocked-days (Get all dates where the entire day is blocked)
+router.get('/blocked-days', async (req, res) => {
+  try {
+    const blockedDocs = await BlockedSchedule.find({ blockedTimes: 'ALL' });
+    const blockedDates = blockedDocs.map(doc => doc.date);
+    return res.json(blockedDates);
+  } catch (error) {
+    console.error('Get blocked days error:', error);
     return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
   }
 });
