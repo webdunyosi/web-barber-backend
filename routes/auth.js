@@ -161,7 +161,7 @@ router.get('/me', requireAuth, async (req, res) => {
 // 4. PUT /api/auth/profile (Update Profile)
 router.put('/profile', requireAuth, async (req, res) => {
   try {
-    const { name, telegram } = req.body;
+    const { name, telegram, password } = req.body;
 
     if (!name || name.trim() === '') {
       return res.status(400).json({ error: 'Ism kiritilishi majburiy' });
@@ -182,6 +182,15 @@ router.put('/profile', requireAuth, async (req, res) => {
 
     user.name = name.trim();
     user.telegram = cleanTelegram;
+
+    // Update password if provided
+    if (password && password.trim() !== '') {
+      if (password.length < 4) {
+        return res.status(400).json({ error: 'Parol uzunligi kamida 4 ta belgidan iborat bo\'lishi kerak' });
+      }
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password, salt);
+    }
     
     await user.save();
 
