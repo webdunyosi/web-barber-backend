@@ -4,8 +4,48 @@ let bot = null;
 
 if (process.env.TELEGRAM_BOT_TOKEN) {
   try {
-    bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
-    console.log('🤖 Telegram Bot: Initialized successfully.');
+    bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+    console.log('🤖 Telegram Bot: Initialized successfully with polling.');
+
+    // Listen for /start command
+    bot.onText(/\/start/, async (msg) => {
+      const chatId = msg.chat.id;
+      const firstName = msg.from?.first_name || 'Mijoz';
+      try {
+        await bot.sendMessage(chatId, `Assalomu alaykum, ${firstName}! **Web Barber** salonining rasmiy botiga xush kelibsiz.\n\nSalon xizmatlaridan foydalanish va navbatga yozilish uchun quyidagi tugmani bosing:`, {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "Salonni ochish 💈", url: "https://t.me/webdunyosi_barbershop_bot/barber" }
+              ]
+            ]
+          }
+        });
+      } catch (error) {
+        console.error('❌ Failed to send start message:', error.message);
+      }
+    });
+
+    // Listen for /open command
+    bot.onText(/\/open/, async (msg) => {
+      const chatId = msg.chat.id;
+      try {
+        await bot.sendMessage(chatId, `**Web Barber** salonini ochish uchun quyidagi tugmani bosing:`, {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "Salonni ochish 💈", url: "https://t.me/webdunyosi_barbershop_bot/barber" }
+              ]
+            ]
+          }
+        });
+      } catch (error) {
+        console.error('❌ Failed to send open message:', error.message);
+      }
+    });
+
   } catch (error) {
     console.error('❌ Telegram Bot initialization error:', error.message);
   }
