@@ -41,12 +41,12 @@ router.post('/', async (req, res) => {
       action = "services";
     } else if (
       text.includes('sartarosh') || 
-      text.includes('husniddin') || 
+      text.includes('behruz') || 
       text.includes('ustasi') || 
       text.includes('tajriba') || 
       text.includes('master')
     ) {
-      reply = "Bizning bosh sartaroshimiz — **Husniddin**.\n\nU 15 yillik professional tajribaga ega (2011-yildan buyon faoliyat yuritadi). Londondagi xalqaro kurslarni tamomlagan va 2020-yilda O'zbekiston chempioni bo'lgan. Hozirgacha 5000 dan ortiq mijozlarga xizmat ko'rsatgan!";
+      reply = "Bizning bosh sartaroshimiz — **Behruz**.\n\nU 15 yillik professional tajribaga ega (2011-yildan buyon faoliyat yuritadi). Londondagi xalqaro kurslarni tamomlagan va 2020-yilda O'zbekiston chempioni bo'lgan. Hozirgacha 5000 dan ortiq mijozlarga xizmat ko'rsatgan!";
       action = "barber";
     } else if (
       text.includes('stil') || 
