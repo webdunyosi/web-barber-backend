@@ -6,6 +6,8 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendTelegramMessage } = require('../utils/telegram');
 const bcrypt = require('bcryptjs');
 const BlockedSchedule = require('../models/BlockedSchedule');
+const Service = require('../models/Service');
+const { upload } = require('../config/storage');
 
 const router = express.Router();
 
@@ -568,6 +570,119 @@ router.delete('/blocked-schedules/by-date/:date', async (req, res) => {
     return res.json({ message: 'Sana blokdan chiqarildi' });
   } catch (error) {
     console.error('Delete blocked schedule error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// 7. GET /api/admin/services (List all services - admin endpoint)
+router.get('/services', async (req, res) => {
+  try {
+    const services = await Service.find().sort({ id: 1 });
+    return res.json(services);
+  } catch (error) {
+    console.error('List services error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// 8. POST /api/admin/services (Create a new service)
+router.post('/services', upload.single('image'), async (req, res) => {
+  try {
+    const { name, name_en, price, duration, image_url } = req.body;
+    const file = req.file;
+
+    if (!name || !price || !duration) {
+      return res.status(400).json({ error: 'Nomi, narxi va davomiyligi majburiy' });
+    }
+
+    let finalImageUrl = image_url || '/styles/1.png';
+    if (file) {
+      finalImageUrl = file.path.startsWith('http')
+        ? file.path
+        : `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
+    }
+
+    // Auto-generate numeric id
+    const maxService = await Service.findOne().sort({ id: -1 });
+    const nextId = maxService && maxService.id ? maxService.id + 1 : 1;
+
+    const newService = new Service({
+      id: nextId,
+      name: name.trim(),
+      name_en: name_en ? name_en.trim() : '',
+      price: Number(price),
+      duration: Number(duration),
+      image_url: finalImageUrl
+    });
+
+    await newService.save();
+
+    // Send Telegram Notification
+    const telegramMsg = `💈 *Yangi xizmat qo'shildi!*\n\n Nomi: ${newService.name}\n Narxi: ${newService.price.toLocaleString()} so'm\n Davomiyligi: ${newService.duration} daqiqa`;
+    await sendTelegramMessage(telegramMsg);
+
+    return res.status(201).json(newService);
+  } catch (error) {
+    console.error('Create service error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// 9. PUT /api/admin/services/:id (Update service by Mongoose ID)
+router.put('/services/:id', upload.single('image'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, name_en, price, duration, image_url } = req.body;
+    const file = req.file;
+
+    const service = await Service.findById(id);
+    if (!service) {
+      return res.status(404).json({ error: 'Xizmat topilmadi' });
+    }
+
+    if (name !== undefined) service.name = name.trim();
+    if (name_en !== undefined) service.name_en = name_en.trim();
+    if (price !== undefined) service.price = Number(price);
+    if (duration !== undefined) service.duration = Number(duration);
+
+    if (file) {
+      service.image_url = file.path.startsWith('http')
+        ? file.path
+        : `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
+    } else if (image_url !== undefined) {
+      service.image_url = image_url;
+    }
+
+    await service.save();
+
+    // Send Telegram Notification
+    const telegramMsg = `💈 *Xizmat ma'lumotlari tahrirlandi!*\n\n Nomi: ${service.name}\n Narxi: ${service.price.toLocaleString()} so'm\n Davomiyligi: ${service.duration} daqiqa`;
+    await sendTelegramMessage(telegramMsg);
+
+    return res.json(service);
+  } catch (error) {
+    console.error('Update service error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// 10. DELETE /api/admin/services/:id (Delete service by Mongoose ID)
+router.delete('/services/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const service = await Service.findByIdAndDelete(id);
+
+    if (!service) {
+      return res.status(404).json({ error: 'Xizmat topilmadi' });
+    }
+
+    // Send Telegram Notification
+    const telegramMsg = `🗑 *Xizmat o'chirildi!*\n\n Nomi: ${service.name}`;
+    await sendTelegramMessage(telegramMsg);
+
+    return res.json({ message: 'Xizmat muvaffaqiyatli o\'chirildi' });
+  } catch (error) {
+    console.error('Delete service error:', error);
     return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
   }
 });

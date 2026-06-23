@@ -73,11 +73,33 @@ async function seedAdminUser() {
   }
 }
 
+// Service Seeding
+async function seedServices() {
+  try {
+    const serviceCount = await Service.countDocuments();
+    if (serviceCount === 0) {
+      const defaultServices = [
+        { id: 1, name: 'Soch olish', name_en: 'Haircut', price: 50000, duration: 30, image_url: '/styles/1.png' },
+        { id: 2, name: 'Soqol olish', name_en: 'Beard Trim', price: 30000, duration: 20, image_url: '/styles/2.png' },
+        { id: 3, name: 'Soch + Soqol', name_en: 'Haircut + Beard', price: 70000, duration: 45, image_url: '/styles/3.png' },
+        { id: 4, name: 'Yuz masaji', name_en: 'Face Massage', price: 40000, duration: 30, image_url: '/styles/4.png' }
+      ];
+      await Service.insertMany(defaultServices);
+      console.log('💈 Default services seeded successfully.');
+    } else {
+      console.log('💈 Services already exist in DB.');
+    }
+  } catch (error) {
+    console.error('❌ Error seeding services:', error.message);
+  }
+}
+
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log('✅ MongoDB muvaffaqiyatli ulandi');
     await seedAdminUser();
+    await seedServices();
   })
   .catch(err => console.error('❌ MongoDB ulanishda xato:', err));
 
