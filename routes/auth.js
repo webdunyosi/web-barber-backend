@@ -161,7 +161,7 @@ router.get('/me', requireAuth, async (req, res) => {
 // 4. PUT /api/auth/profile (Update Profile)
 router.put('/profile', requireAuth, async (req, res) => {
   try {
-    const { name, telegram, password } = req.body;
+    const { name, phone, telegram, password } = req.body;
 
     if (!name || name.trim() === '') {
       return res.status(400).json({ error: 'Ism kiritilishi majburiy' });
@@ -178,6 +178,23 @@ router.put('/profile', requireAuth, async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+    }
+
+    // Update phone if provided
+    if (phone !== undefined) {
+      const trimmedPhone = phone.trim();
+      if (trimmedPhone === '') {
+        return res.status(400).json({ error: 'Telefon raqami bo\'sh bo\'lishi mumkin emas' });
+      }
+      const formattedPhone = formatUzbekPhone(trimmedPhone);
+      if (formattedPhone !== user.phone) {
+        // Verify unique phone
+        const existingUser = await User.findOne({ phone: formattedPhone });
+        if (existingUser) {
+          return res.status(400).json({ error: 'Bu telefon raqami allaqachon ro\'yxatdan o\'tgan' });
+        }
+        user.phone = formattedPhone;
+      }
     }
 
     user.name = name.trim();
