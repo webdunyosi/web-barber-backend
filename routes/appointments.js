@@ -139,9 +139,19 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
       // Send plain text message if cash payment (no receipt photo)
       await sendTelegramMessage(caption);
     } else {
-      // Send Telegram photo
-      const photoSource = file.path.startsWith('http') ? file.path : file.path;
+      // Send Telegram photo — local fayl uchun absolute path ga o'tkazamiz
+      let photoSource;
+      if (file.path && file.path.startsWith('http')) {
+        // Cloudinary URL
+        photoSource = file.path;
+      } else {
+        // Local fayl — absolute path
+        const path = require('path');
+        photoSource = path.resolve(__dirname, '..', file.path);
+      }
+      console.log('📤 Sending receipt to Telegram. Source:', photoSource);
       await sendTelegramPhoto(photoSource, caption);
+
 
       // Delete receipt file after sending to Telegram to save server space
       if (file.path && !file.path.startsWith('http')) {

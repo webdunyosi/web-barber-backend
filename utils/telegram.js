@@ -38,15 +38,25 @@ const sendTelegramPhoto = async (photoSource, caption) => {
   }
   try {
     let source = photoSource;
+
     if (typeof photoSource === 'string' && !photoSource.startsWith('http')) {
-      const absolutePath = path.isAbsolute(photoSource) ? photoSource : path.resolve(photoSource);
+      // Local fayl — absolute path ga o'tkazamiz
+      const absolutePath = path.isAbsolute(photoSource)
+        ? photoSource
+        : path.resolve(process.cwd(), photoSource);
+
+      console.log(`📂 Telegram: Local file absolute path: ${absolutePath}`);
+
       if (fs.existsSync(absolutePath)) {
         source = fs.createReadStream(absolutePath);
-        console.log(`📂 Telegram: Loading local file stream from: ${absolutePath}`);
       } else {
         console.warn(`⚠️ Telegram photo file does not exist: ${absolutePath}`);
+        // Rasm topilmasa matn sifatida yuboramiz
+        await bot.sendMessage(channelId, caption + '\n\n⚠️ _(Chek rasmi yuklanmadi)_', { parse_mode: 'Markdown' });
+        return;
       }
     }
+
     await bot.sendPhoto(channelId, source, {
       caption: caption,
       parse_mode: 'Markdown'
@@ -54,6 +64,13 @@ const sendTelegramPhoto = async (photoSource, caption) => {
     console.log('📸 Telegram photo sent to channel successfully.');
   } catch (error) {
     console.error('❌ Failed to send Telegram photo:', error.message);
+    // Rasm xato bo'lsa, matn sifatida yuboramiz (kanal doim xabar oladi)
+    try {
+      await bot.sendMessage(channelId, caption + '\n\n⚠️ _(Chek rasmi yuborishda xatolik)_', { parse_mode: 'Markdown' });
+      console.log('📬 Fallback text message sent to channel.');
+    } catch (fallbackErr) {
+      console.error('❌ Fallback message also failed:', fallbackErr.message);
+    }
   }
 };
 
