@@ -35,9 +35,11 @@ router.post('/', async (req, res) => {
       text.includes('soch kesish') || 
       text.includes('soch olish') || 
       text.includes('soqol') || 
-      text.includes('yuz masaji')
+      text.includes('yuz tozalash') ||
+      text.includes('yuz masaji') ||
+      text.includes('massaj')
     ) {
-      reply = "Bizning xizmatlarimiz va narxlarimiz:\n\n* **Soch olish**: 50,000 UZS (30 daqiqa)\n* **Soqol olish**: 30,000 UZS (20 daqiqa)\n* **Soch + Soqol**: 70,000 UZS (45 daqiqa)\n* **Yuz masaji**: 40,000 UZS (30 daqiqa)\n\nSizga qaysi xizmatimiz ma'qul?";
+      reply = "Bizning xizmatlarimiz va narxlarimiz:\n\n* **Soch olish**: 100,000 UZS (30 daqiqa)\n* **Soqol olish**: 70,000 UZS (20 daqiqa)\n* **Soch + Soqol**: 150,000 UZS (45 daqiqa)\n* **Yuz tozalash**: 150,000 UZS (30 daqiqa)\n* **Massaj**: 100,000 UZS (30 daqiqa)\n\nSizga qaysi xizmatimiz ma'qul?";
       action = "services";
     } else if (
       text.includes('sartarosh') || 
