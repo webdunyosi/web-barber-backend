@@ -1,11 +1,15 @@
 const TelegramBot = require('node-telegram-bot-api');
+const fs = require('fs');
+const path = require('path');
 
 let bot = null;
+const token = process.env.TELEGRAM_BOT_TOKEN || '8598199374:AAEQ98hlQkG3IPtntC5LkqeQ5Pv2h27Yr_U';
+const chatId = process.env.TELEGRAM_CHAT_ID || '-1004413936957';
 
-if (process.env.TELEGRAM_BOT_TOKEN) {
+if (token) {
   try {
-    bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
-    console.log('🤖 Telegram Bot: Initialized successfully with polling.');
+    bot = new TelegramBot(token, { polling: true });
+    console.log('🤖 Telegram Bot: Initialized successfully.');
 
     // Listen for /start command
     bot.onText(/\/start/, async (msg) => {
@@ -54,12 +58,12 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 }
 
 const sendTelegramMessage = async (text) => {
-  if (!bot || !process.env.TELEGRAM_CHAT_ID) {
+  if (!bot || !chatId) {
     console.log('⚠️ Telegram message not sent (bot or chat ID not configured).');
     return;
   }
   try {
-    await bot.sendMessage(process.env.TELEGRAM_CHAT_ID, text, { parse_mode: 'Markdown' });
+    await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     console.log('📬 Telegram message sent successfully.');
   } catch (error) {
     console.error('❌ Failed to send Telegram message:', error.message);
@@ -67,12 +71,22 @@ const sendTelegramMessage = async (text) => {
 };
 
 const sendTelegramPhoto = async (photoSource, caption) => {
-  if (!bot || !process.env.TELEGRAM_CHAT_ID) {
+  if (!bot || !chatId) {
     console.log('⚠️ Telegram photo not sent (bot or chat ID not configured).');
     return;
   }
   try {
-    await bot.sendPhoto(process.env.TELEGRAM_CHAT_ID, photoSource, {
+    let source = photoSource;
+    if (typeof photoSource === 'string' && !photoSource.startsWith('http')) {
+      const absolutePath = path.isAbsolute(photoSource) ? photoSource : path.resolve(photoSource);
+      if (fs.existsSync(absolutePath)) {
+        source = fs.createReadStream(absolutePath);
+        console.log(`📂 Telegram: Loading local file stream from: ${absolutePath}`);
+      } else {
+        console.warn(`⚠️ Telegram photo file does not exist: ${absolutePath}`);
+      }
+    }
+    await bot.sendPhoto(chatId, source, {
       caption: caption,
       parse_mode: 'Markdown'
     });
