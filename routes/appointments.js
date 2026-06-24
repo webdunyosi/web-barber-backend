@@ -3,7 +3,7 @@ const Appointment = require('../models/Appointment');
 const User = require('../models/User');
 const BlockedSchedule = require('../models/BlockedSchedule');
 const { requireAuth } = require('../middleware/auth');
-const { upload } = require('../config/storage');
+const { upload, uploadType, cloudinary } = require('../config/storage');
 const { sendTelegramPhoto, sendTelegramMessage } = require('../utils/telegram');
 
 const router = express.Router();
@@ -110,7 +110,7 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
       date,
       time,
       paymentMethod: isFree ? 'cash' : (paymentMethod || 'card'),
-      receipt: receiptUrl || undefined,
+      receipt: '',
       userId: req.user._id,
       isFree: isFree
     });
@@ -143,7 +143,7 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
       const photoSource = file.path.startsWith('http') ? file.path : file.path;
       await sendTelegramPhoto(photoSource, caption);
 
-      // Delete local receipt file after sending to Telegram to save server space
+      // Delete receipt file after sending to Telegram to save server space
       if (file.path && !file.path.startsWith('http')) {
         const fs = require('fs');
         try {
@@ -153,6 +153,13 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
           }
         } catch (err) {
           console.error('Failed to delete local receipt file:', err);
+        }
+      } else if (uploadType === 'cloudinary' && file.filename) {
+        try {
+          await cloudinary.uploader.destroy(file.filename);
+          console.log('🗑️ Cloudinary receipt file deleted successfully after Telegram dispatch.');
+        } catch (err) {
+          console.error('Failed to delete Cloudinary receipt file:', err);
         }
       }
     }
