@@ -73,7 +73,15 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
     const file = req.file;
 
     if (!name || !phone || !serviceName || !servicePrice || !date || !time) {
-      return res.status(400).json({ error: 'Barcha maydonlar to\'ldirilishi shart' });
+      const missing = [];
+      if (!name) missing.push('name');
+      if (!phone) missing.push('phone');
+      if (!serviceName) missing.push('serviceName');
+      if (!servicePrice) missing.push('servicePrice');
+      if (!date) missing.push('date');
+      if (!time) missing.push('time');
+      console.log('❌ Missing fields:', missing, 'Body:', req.body);
+      return res.status(400).json({ error: `Barcha maydonlar to'ldirilishi shart. Yetishmayotgan maydonlar: ${missing.join(', ')}` });
     }
 
     const user = await User.findById(req.user._id);
