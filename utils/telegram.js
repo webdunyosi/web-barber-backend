@@ -87,3 +87,5 @@ module.exports = {
   sendTelegramMessage,
   sendTelegramPhoto
 };
+// Trigger nodemon reload for new .env variables
+
