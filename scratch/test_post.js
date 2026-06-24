@@ -45,7 +45,7 @@ async function testPost() {
     }
 
     console.log('Sending POST request...');
-    const response = await fetch('http://localhost:5000/api/appointments', {
+    const response = await fetch('https://web-barber-backend.onrender.com/api/appointments', {
       method: 'POST',
       body: form,
       headers: {
