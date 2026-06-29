@@ -8,6 +8,7 @@ const bcrypt = require('bcryptjs');
 const BlockedSchedule = require('../models/BlockedSchedule');
 const Service = require('../models/Service');
 const { upload } = require('../config/storage');
+const { autoRejectPastAppointments } = require('../utils/appointmentHelper');
 
 const router = express.Router();
 
@@ -215,6 +216,9 @@ router.put('/users/:id', async (req, res) => {
 // 4. GET /api/admin/bookings (List Bookings)
 router.get('/bookings', async (req, res) => {
   try {
+    // Auto-reject past pending appointments first
+    await autoRejectPastAppointments();
+
     const bookings = await Appointment.find()
       .populate('userId', 'name phone telegram role status loyaltyStamps')
       .sort({ createdAt: -1 });

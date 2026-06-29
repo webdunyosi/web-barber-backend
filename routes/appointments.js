@@ -5,6 +5,7 @@ const BlockedSchedule = require('../models/BlockedSchedule');
 const { requireAuth } = require('../middleware/auth');
 const { upload, uploadType, cloudinary } = require('../config/storage');
 const { sendTelegramPhoto, sendTelegramMessage } = require('../utils/telegram');
+const { autoRejectPastAppointments } = require('../utils/appointmentHelper');
 
 const router = express.Router();
 
@@ -12,6 +13,9 @@ const router = express.Router();
 router.get('/booked', async (req, res) => {
   try {
     const { date } = req.query;
+    
+    // Auto-reject any past pending bookings first
+    await autoRejectPastAppointments();
     if (!date) {
       return res.status(400).json({ error: 'Sana kiritilishi shart (sana formati: DD.MM.YYYY)' });
     }
@@ -188,6 +192,9 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
 // 3. GET /api/appointments/my (Get logged-in user's appointments)
 router.get('/my', requireAuth, async (req, res) => {
   try {
+    // Auto-reject any past pending bookings first
+    await autoRejectPastAppointments();
+
     const appointments = await Appointment.find({ userId: req.user._id }).sort({ createdAt: -1 });
     return res.json(appointments);
   } catch (error) {
