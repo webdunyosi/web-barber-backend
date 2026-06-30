@@ -24,6 +24,12 @@ const requireAuth = async (req, res, next) => {
       return res.status(403).json({ error: 'Sizning profilingiz bloklangan! Sartarosh bilan bog\'laning.' });
     }
 
+    // Resolve loyaltyStamps for the selected barber from the header
+    const barberId = req.headers['x-barber-id'];
+    if (barberId && user.loyaltyStampsMap) {
+      user.loyaltyStamps = user.loyaltyStampsMap.get(barberId.toString()) || 0;
+    }
+
     req.user = user;
     next();
   } catch (error) {
@@ -36,7 +42,19 @@ const requireAdmin = (req, res, next) => {
     return res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan' });
   }
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Sizda ushbu amalni bajarish uchun ruxsat yo\'q' });
+  }
+
+  next();
+};
+
+const requireSuperAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan' });
+  }
+
+  if (req.user.role !== 'superadmin') {
     return res.status(403).json({ error: 'Sizda ushbu amalni bajarish uchun ruxsat yo\'q' });
   }
 
@@ -45,5 +63,6 @@ const requireAdmin = (req, res, next) => {
 
 module.exports = {
   requireAuth,
-  requireAdmin
+  requireAdmin,
+  requireSuperAdmin
 };

@@ -31,7 +31,8 @@ const NotificationSchema = new mongoose.Schema({
   createdAt: { 
     type: Date, 
     default: Date.now 
-  }
+  },
+  barberId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 });
 
 module.exports = mongoose.model('Notification', NotificationSchema);

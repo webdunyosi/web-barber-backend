@@ -12,7 +12,7 @@ const router = express.Router();
 // 1. GET /api/appointments/booked (Get booked slots for a specific date)
 router.get('/booked', async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, barberId } = req.query;
     
     // Auto-reject any past pending bookings first
     await autoRejectPastAppointments();
@@ -20,16 +20,29 @@ router.get('/booked', async (req, res) => {
       return res.status(400).json({ error: 'Sana kiritilishi shart (sana formati: DD.MM.YYYY)' });
     }
 
-    // Query appointments where date matches and status is NOT 'rejected'
+    let targetBarberId = barberId || req.headers['x-barber-id'];
+    if (!targetBarberId) {
+      const defaultAdmin = await User.findOne({ role: 'admin' });
+      if (defaultAdmin) {
+        targetBarberId = defaultAdmin._id;
+      }
+    }
+
+    if (!targetBarberId) {
+      return res.status(400).json({ error: 'Sartarosh topilmadi' });
+    }
+
+    // Query appointments where date and barberId match, and status is NOT 'rejected'
     const appointments = await Appointment.find({
       date: date,
+      barberId: targetBarberId,
       status: { $ne: 'rejected' }
     });
 
     const bookedTimes = appointments.map(app => app.time);
 
-    // Fetch blocked times for this date from BlockedSchedule
-    const blockedDoc = await BlockedSchedule.findOne({ date });
+    // Fetch blocked times for this date and barberId from BlockedSchedule
+    const blockedDoc = await BlockedSchedule.findOne({ date, barberId: targetBarberId });
     if (blockedDoc) {
       if (blockedDoc.blockedTimes.includes('ALL')) {
         // If ALL slots are blocked, return all possible slots as booked
@@ -61,7 +74,20 @@ router.get('/booked', async (req, res) => {
 // 1b. GET /api/appointments/blocked-days (Get all dates where the entire day is blocked)
 router.get('/blocked-days', async (req, res) => {
   try {
-    const blockedDocs = await BlockedSchedule.find({ blockedTimes: 'ALL' });
+    const { barberId } = req.query;
+    let targetBarberId = barberId || req.headers['x-barber-id'];
+    if (!targetBarberId) {
+      const defaultAdmin = await User.findOne({ role: 'admin' });
+      if (defaultAdmin) {
+        targetBarberId = defaultAdmin._id;
+      }
+    }
+
+    if (!targetBarberId) {
+      return res.json([]);
+    }
+
+    const blockedDocs = await BlockedSchedule.find({ barberId: targetBarberId, blockedTimes: 'ALL' });
     const blockedDates = blockedDocs.map(doc => doc.date);
     return res.json(blockedDates);
   } catch (error) {
@@ -73,7 +99,7 @@ router.get('/blocked-days', async (req, res) => {
 // 2. POST /api/appointments (Create Booking)
 router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
   try {
-    const { name, phone, telegram_user, serviceName, servicePrice, date, time, paymentMethod } = req.body;
+    const { name, phone, telegram_user, serviceName, servicePrice, date, time, paymentMethod, barberId } = req.body;
     const file = req.file;
 
     if (!name || !phone || !serviceName || !servicePrice || !date || !time) {
@@ -86,6 +112,18 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
       if (!time) missing.push('time');
       console.log('❌ Missing fields:', missing, 'Body:', req.body);
       return res.status(400).json({ error: `Barcha maydonlar to'ldirilishi shart. Yetishmayotgan maydonlar: ${missing.join(', ')}` });
+    }
+
+    let targetBarberId = barberId || req.headers['x-barber-id'];
+    if (!targetBarberId) {
+      const defaultAdmin = await User.findOne({ role: 'admin' });
+      if (defaultAdmin) {
+        targetBarberId = defaultAdmin._id;
+      }
+    }
+
+    if (!targetBarberId) {
+      return res.status(400).json({ error: 'Sartarosh tanlanishi shart' });
     }
 
     const user = await User.findById(req.user._id);
@@ -104,7 +142,7 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
         : `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
     }
 
-    // Create and save new Appointment linked to user ID
+    // Create and save new Appointment linked to user ID and barber ID
     const newAppointment = new Appointment({
       name,
       phone,
@@ -114,9 +152,10 @@ router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
       date,
       time,
       paymentMethod: isFree ? 'cash' : (paymentMethod || 'card'),
-      receipt: '',
+      receipt: receiptUrl,
       userId: req.user._id,
-      isFree: isFree
+      isFree: isFree,
+      barberId: targetBarberId
     });
 
     await newAppointment.save();

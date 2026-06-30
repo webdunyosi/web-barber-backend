@@ -70,6 +70,11 @@ router.post('/register', async (req, res) => {
     await sendTelegramMessage(telegramMsg);
 
     const token = generateToken(newUser._id);
+    const barberId = req.headers['x-barber-id'];
+    let stamps = newUser.loyaltyStamps;
+    if (barberId && newUser.loyaltyStampsMap) {
+      stamps = newUser.loyaltyStampsMap.get(barberId.toString()) || 0;
+    }
 
     return res.status(201).json({
       token,
@@ -80,7 +85,7 @@ router.post('/register', async (req, res) => {
         telegram: newUser.telegram,
         role: newUser.role,
         status: newUser.status,
-        loyaltyStamps: newUser.loyaltyStamps
+        loyaltyStamps: stamps
       }
     });
 
@@ -119,6 +124,11 @@ router.post('/login', async (req, res) => {
     }
 
     const token = generateToken(user._id);
+    const barberId = req.headers['x-barber-id'];
+    let stamps = user.loyaltyStamps;
+    if (barberId && user.loyaltyStampsMap) {
+      stamps = user.loyaltyStampsMap.get(barberId.toString()) || 0;
+    }
 
     return res.json({
       token,
@@ -129,7 +139,7 @@ router.post('/login', async (req, res) => {
         telegram: user.telegram,
         role: user.role,
         status: user.status,
-        loyaltyStamps: user.loyaltyStamps
+        loyaltyStamps: stamps
       }
     });
 

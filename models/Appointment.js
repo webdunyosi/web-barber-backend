@@ -12,7 +12,8 @@ const AppointmentSchema = new mongoose.Schema({
   paymentMethod: { type: String, enum: ['card', 'cash'], default: 'card' },
   receipt: { type: String, required: false }, // Cloudinary URL to payment check image (optional for cash)
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  isFree: { type: Boolean, default: false }
+  isFree: { type: Boolean, default: false },
+  barberId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Appointment', AppointmentSchema);

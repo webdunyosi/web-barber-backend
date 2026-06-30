@@ -219,8 +219,8 @@ router.get('/bookings', async (req, res) => {
     // Auto-reject past pending appointments first
     await autoRejectPastAppointments();
 
-    const bookings = await Appointment.find()
-      .populate('userId', 'name phone telegram role status loyaltyStamps')
+    const bookings = await Appointment.find({ barberId: req.user._id })
+      .populate('userId', 'name phone telegram role status loyaltyStamps loyaltyStampsMap')
       .sort({ createdAt: -1 });
     return res.json(bookings);
   } catch (error) {
@@ -239,7 +239,7 @@ router.put('/bookings/:id', async (req, res) => {
       return res.status(400).json({ error: 'Yaroqsiz holat. Faqat "confirmed" yoki "rejected" bo\'lishi mumkin' });
     }
 
-    const booking = await Appointment.findById(id);
+    const booking = await Appointment.findOne({ _id: id, barberId: req.user._id });
 
     if (!booking) {
       return res.status(404).json({ error: 'Buyurtma topilmadi' });
@@ -249,25 +249,34 @@ router.put('/bookings/:id', async (req, res) => {
     booking.status = status;
     await booking.save();
 
-    // Loyalty program stamp management
+    // Loyalty program stamp management (scoped by barberId)
+    const barberIdStr = req.user._id.toString();
     if (status === 'confirmed' && previousStatus !== 'confirmed') {
       const user = await User.findById(booking.userId);
       if (user && user.role === 'user') {
+        const currentStamps = user.loyaltyStampsMap.get(barberIdStr) || 0;
+        let newStamps = 0;
         if (booking.isFree) {
-          user.loyaltyStamps = 0; // 10th free visit completed, reset to 0
+          newStamps = 0; // 10th free visit completed, reset to 0
         } else {
-          user.loyaltyStamps = Math.min((user.loyaltyStamps || 0) + 1, 9);
+          newStamps = Math.min(currentStamps + 1, 9);
         }
+        user.loyaltyStampsMap.set(barberIdStr, newStamps);
+        user.loyaltyStamps = newStamps;
         await user.save();
       }
     } else if (status !== 'confirmed' && previousStatus === 'confirmed') {
       const user = await User.findById(booking.userId);
       if (user && user.role === 'user') {
+        const currentStamps = user.loyaltyStampsMap.get(barberIdStr) || 0;
+        let newStamps = 0;
         if (booking.isFree) {
-          user.loyaltyStamps = 9; // free visit cancelled/rejected, restore to 9 stamps
+          newStamps = 9; // free visit cancelled/rejected, restore to 9 stamps
         } else {
-          user.loyaltyStamps = Math.max((user.loyaltyStamps || 0) - 1, 0);
+          newStamps = Math.max(currentStamps - 1, 0);
         }
+        user.loyaltyStampsMap.set(barberIdStr, newStamps);
+        user.loyaltyStamps = newStamps;
         await user.save();
       }
     }
@@ -288,21 +297,26 @@ router.put('/bookings/:id', async (req, res) => {
 router.delete('/bookings/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const booking = await Appointment.findById(id);
+    const booking = await Appointment.findOne({ _id: id, barberId: req.user._id });
 
     if (!booking) {
       return res.status(404).json({ error: 'Buyurtma topilmadi' });
     }
 
-    // If deleting a confirmed booking, revert the stamp/points
+    // If deleting a confirmed booking, revert the stamp/points (scoped by barberId)
     if (booking.status === 'confirmed') {
       const user = await User.findById(booking.userId);
       if (user && user.role === 'user') {
+        const barberIdStr = req.user._id.toString();
+        const currentStamps = user.loyaltyStampsMap.get(barberIdStr) || 0;
+        let newStamps = 0;
         if (booking.isFree) {
-          user.loyaltyStamps = 9;
+          newStamps = 9;
         } else {
-          user.loyaltyStamps = Math.max((user.loyaltyStamps || 0) - 1, 0);
+          newStamps = Math.max(currentStamps - 1, 0);
         }
+        user.loyaltyStampsMap.set(barberIdStr, newStamps);
+        user.loyaltyStamps = newStamps;
         await user.save();
       }
     }
@@ -325,7 +339,7 @@ router.delete('/bookings/:id', async (req, res) => {
 router.get('/offline-income/:date', async (req, res) => {
   try {
     const { date } = req.params; // Format: "DD.MM.YYYY"
-    const doc = await OfflineIncome.findOne({ date });
+    const doc = await OfflineIncome.findOne({ date, barberId: req.user._id });
     return res.json({ date, amount: doc ? doc.amount : 0 });
   } catch (error) {
     console.error('Get offline income error:', error);
@@ -347,8 +361,8 @@ router.post('/offline-income', async (req, res) => {
     }
 
     const doc = await OfflineIncome.findOneAndUpdate(
-      { date },
-      { amount: numericAmount },
+      { date, barberId: req.user._id },
+      { amount: numericAmount, barberId: req.user._id },
       { new: true, upsert: true }
     );
 
@@ -362,17 +376,19 @@ router.post('/offline-income', async (req, res) => {
 // 6. GET /api/admin/statistics (Financial & Business Stats)
 router.get('/statistics', async (req, res) => {
   try {
-    const users = await User.find({ role: 'user' });
+    const bookings = await Appointment.find({ barberId: req.user._id });
+    const clientIds = [...new Set(bookings.map(b => b.userId.toString()))];
+    const users = await User.find({ _id: { $in: clientIds }, role: 'user' });
+    
     const totalUsers = users.length;
     const blockedUsers = users.filter(u => u.status === 'blocked').length;
 
-    const bookings = await Appointment.find();
     const totalBookings = bookings.length;
     const pendingBookings = bookings.filter(b => b.status === 'pending').length;
     const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
     const confirmedBookingsCount = confirmedBookings.length;
 
-    const offlineIncomes = await OfflineIncome.find();
+    const offlineIncomes = await OfflineIncome.find({ barberId: req.user._id });
 
     // Helper to parse "DD.MM.YYYY" to Date object
     const parseBookingDate = (dateStr) => {
@@ -537,7 +553,7 @@ router.get('/statistics', async (req, res) => {
 // GET /api/admin/blocked-schedules (List all blocked dates/slots)
 router.get('/blocked-schedules', async (req, res) => {
   try {
-    const schedules = await BlockedSchedule.find().sort({ createdAt: -1 });
+    const schedules = await BlockedSchedule.find({ barberId: req.user._id }).sort({ createdAt: -1 });
     return res.json(schedules);
   } catch (error) {
     console.error('List blocked schedules error:', error);
@@ -554,8 +570,8 @@ router.post('/blocked-schedules', async (req, res) => {
     }
 
     const schedule = await BlockedSchedule.findOneAndUpdate(
-      { date },
-      { blockedTimes, reason: reason || '' },
+      { date, barberId: req.user._id },
+      { blockedTimes, reason: reason || '', barberId: req.user._id },
       { new: true, upsert: true }
     );
 
@@ -570,7 +586,7 @@ router.post('/blocked-schedules', async (req, res) => {
 router.delete('/blocked-schedules/by-date/:date', async (req, res) => {
   try {
     const { date } = req.params; // e.g. "06.06.2026"
-    await BlockedSchedule.findOneAndDelete({ date });
+    await BlockedSchedule.findOneAndDelete({ date, barberId: req.user._id });
     return res.json({ message: 'Sana blokdan chiqarildi' });
   } catch (error) {
     console.error('Delete blocked schedule error:', error);
@@ -581,7 +597,7 @@ router.delete('/blocked-schedules/by-date/:date', async (req, res) => {
 // 7. GET /api/admin/services (List all services - admin endpoint)
 router.get('/services', async (req, res) => {
   try {
-    const services = await Service.find().sort({ id: 1 });
+    const services = await Service.find({ barberId: req.user._id }).sort({ id: 1 });
     return res.json(services);
   } catch (error) {
     console.error('List services error:', error);
@@ -606,8 +622,8 @@ router.post('/services', upload.single('image'), async (req, res) => {
         : `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
     }
 
-    // Auto-generate numeric id
-    const maxService = await Service.findOne().sort({ id: -1 });
+    // Auto-generate numeric id (scoped by barberId)
+    const maxService = await Service.findOne({ barberId: req.user._id }).sort({ id: -1 });
     const nextId = maxService && maxService.id ? maxService.id + 1 : 1;
 
     const newService = new Service({
@@ -616,7 +632,8 @@ router.post('/services', upload.single('image'), async (req, res) => {
       name_en: name_en ? name_en.trim() : '',
       price: Number(price),
       duration: Number(duration),
-      image_url: finalImageUrl
+      image_url: finalImageUrl,
+      barberId: req.user._id
     });
 
     await newService.save();
@@ -639,7 +656,7 @@ router.put('/services/:id', upload.single('image'), async (req, res) => {
     const { name, name_en, price, duration, image_url } = req.body;
     const file = req.file;
 
-    const service = await Service.findById(id);
+    const service = await Service.findOne({ _id: id, barberId: req.user._id });
     if (!service) {
       return res.status(404).json({ error: 'Xizmat topilmadi' });
     }
@@ -674,7 +691,7 @@ router.put('/services/:id', upload.single('image'), async (req, res) => {
 router.delete('/services/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const service = await Service.findByIdAndDelete(id);
+    const service = await Service.findOneAndDelete({ _id: id, barberId: req.user._id });
 
     if (!service) {
       return res.status(404).json({ error: 'Xizmat topilmadi' });

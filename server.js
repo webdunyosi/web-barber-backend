@@ -14,6 +14,8 @@ const appointmentRoutes = require('./routes/appointments');
 const adminRoutes = require('./routes/admin');
 const chatRoutes = require('./routes/chat');
 const notificationsRoutes = require('./routes/notifications');
+const superadminRoutes = require('./routes/superadmin');
+const barberRoutes = require('./routes/barber');
 
 const app = express();
 
@@ -37,16 +39,45 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/superadmin', superadminRoutes);
+app.use('/api/barbers', barberRoutes);
 
-// Preserve original Service list endpoint
+// Preserve original Service list endpoint, scoped by barberId if provided
 app.get('/api/services', async (req, res) => {
   try {
-    const services = await Service.find();
+    const { barberId } = req.query;
+    const filter = barberId ? { barberId } : {};
+    const services = await Service.find(filter);
     res.json(services);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Super Admin User Seeding
+async function seedSuperAdminUser() {
+  try {
+    const superAdminExists = await User.findOne({ role: 'superadmin' });
+    if (!superAdminExists) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash('superadmin', salt);
+      const superAdminUser = new User({
+        name: 'Tizim Super Admini',
+        phone: '+998 99 888 88 88',
+        telegram: '',
+        password: hashedPassword,
+        role: 'superadmin',
+        status: 'active'
+      });
+      await superAdminUser.save();
+      console.log('👑 Super Admin user seeded successfully: +998 99 888 88 88 / superadmin');
+    } else {
+      console.log('👑 Super Admin user already exists.');
+    }
+  } catch (error) {
+    console.error('❌ Error seeding super admin user:', error.message);
+  }
+}
 
 // Admin User Seeding
 async function seedAdminUser() {
@@ -61,10 +92,13 @@ async function seedAdminUser() {
         telegram: '',
         password: hashedPassword,
         role: 'admin',
-        status: 'active'
+        status: 'active',
+        slug: 'alimardon',
+        shopName: 'Alimardon Barber Shop',
+        description: 'Toshkentdagi eng sifatli sartaroshxona'
       });
       await adminUser.save();
-      console.log('👑 Admin user seeded successfully: +998 99 999 99 99 / admin');
+      console.log('👑 Admin user seeded successfully: +998 99 999 99 99 / admin (slug: alimardon)');
     } else {
       console.log('👑 Admin user already exists.');
     }
@@ -76,17 +110,20 @@ async function seedAdminUser() {
 // Service Seeding
 async function seedServices() {
   try {
+    const adminUser = await User.findOne({ role: 'admin', slug: 'alimardon' });
+    if (!adminUser) return;
+
     const serviceCount = await Service.countDocuments();
     if (serviceCount === 0) {
       const defaultServices = [
-        { id: 1, name: 'Soch olish', name_en: 'Haircut', price: 100000, duration: 30, image_url: '/styles/1.png' },
-        { id: 2, name: 'Soqol olish', name_en: 'Beard Trim', price: 70000, duration: 20, image_url: '/styles/2.png' },
-        { id: 3, name: 'Soch + Soqol', name_en: 'Haircut + Beard', price: 150000, duration: 45, image_url: '/styles/3.png' },
-        { id: 4, name: 'Yuz tozalash', name_en: 'Face Massage', price: 150000, duration: 30, image_url: '/styles/4.png' },
-        { id: 5, name: 'Massaj', name_en: 'Massage', price: 100000, duration: 30, image_url: '/styles/4.png' }
+        { id: 1, name: 'Soch olish', name_en: 'Haircut', price: 100000, duration: 30, image_url: '/styles/1.png', barberId: adminUser._id },
+        { id: 2, name: 'Soqol olish', name_en: 'Beard Trim', price: 70000, duration: 20, image_url: '/styles/2.png', barberId: adminUser._id },
+        { id: 3, name: 'Soch + Soqol', name_en: 'Haircut + Beard', price: 150000, duration: 45, image_url: '/styles/3.png', barberId: adminUser._id },
+        { id: 4, name: 'Yuz tozalash', name_en: 'Face Massage', price: 150000, duration: 30, image_url: '/styles/4.png', barberId: adminUser._id },
+        { id: 5, name: 'Massaj', name_en: 'Massage', price: 100000, duration: 30, image_url: '/styles/4.png', barberId: adminUser._id }
       ];
       await Service.insertMany(defaultServices);
-      console.log('💈 Default services seeded successfully.');
+      console.log('💈 Default services seeded successfully for Alimardon.');
     } else {
       console.log('💈 Services already exist in DB.');
     }
@@ -99,6 +136,7 @@ async function seedServices() {
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log('✅ MongoDB muvaffaqiyatli ulandi');
+    await seedSuperAdminUser();
     await seedAdminUser();
     await seedServices();
   })
