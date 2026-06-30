@@ -31,10 +31,19 @@ const generateToken = (userId) => {
 // 1. POST /api/auth/register (Register User)
 router.post('/register', async (req, res) => {
   try {
-    const { name, phone, telegram, password } = req.body;
+    const { name, phone, telegram, password, barberSlug } = req.body;
 
     if (!name || !phone || !password) {
       return res.status(400).json({ error: 'Ism, telefon raqami va parol majburiy' });
+    }
+
+    if (!barberSlug) {
+      return res.status(400).json({ error: 'Sartarosh kodi (login) majburiy' });
+    }
+
+    const barber = await User.findOne({ role: 'admin', slug: barberSlug.toLowerCase(), status: 'active' });
+    if (!barber) {
+      return res.status(400).json({ error: 'Sartarosh kodi noto\'g\'ri yoki sartarosh faol emas' });
     }
 
     const formattedPhone = formatUzbekPhone(phone);
@@ -66,15 +75,11 @@ router.post('/register', async (req, res) => {
     await newUser.save();
 
     // Send Telegram Notification
-    const telegramMsg = `👤 *Yangi Mijoz Ro'yxatdan O'tdi!*\n\n📝 *Ismi:* ${newUser.name}\n📱 *Telefon:* ${newUser.phone}\n✈️ *Telegram:* @${newUser.telegram || 'kiritilmagan'}\n📅 *Sana:* ${new Date().toLocaleDateString('uz-UZ')}`;
+    const telegramMsg = `👤 *Yangi Mijoz Ro'yxatdan O'tdi!*\n\n📝 *Ismi:* ${newUser.name}\n📱 *Telefon:* ${newUser.phone}\n✈️ *Telegram:* @${newUser.telegram || 'kiritilmagan'}\n💈 *Sartarosh:* ${barber.shopName || barber.name}\n📅 *Sana:* ${new Date().toLocaleDateString('uz-UZ')}`;
     await sendTelegramMessage(telegramMsg);
 
     const token = generateToken(newUser._id);
-    const barberId = req.headers['x-barber-id'];
-    let stamps = newUser.loyaltyStamps;
-    if (barberId && newUser.loyaltyStampsMap) {
-      stamps = newUser.loyaltyStampsMap.get(barberId.toString()) || 0;
-    }
+    let stamps = 0;
 
     return res.status(201).json({
       token,
@@ -86,6 +91,13 @@ router.post('/register', async (req, res) => {
         role: newUser.role,
         status: newUser.status,
         loyaltyStamps: stamps
+      },
+      activeBarber: {
+        _id: barber._id,
+        name: barber.name,
+        slug: barber.slug,
+        shopName: barber.shopName,
+        avatar: barber.avatar
       }
     });
 
@@ -98,7 +110,7 @@ router.post('/register', async (req, res) => {
 // 2. POST /api/auth/login (Login User)
 router.post('/login', async (req, res) => {
   try {
-    const { phone, password } = req.body;
+    const { phone, password, barberSlug } = req.body;
 
     if (!phone || !password) {
       return res.status(400).json({ error: 'Telefon raqam va parol majburiy' });
@@ -123,14 +135,32 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ error: 'Sizning profilingiz bloklangan! Sartarosh bilan bog\'laning.' });
     }
 
-    const token = generateToken(user._id);
-    const barberId = req.headers['x-barber-id'];
-    let stamps = user.loyaltyStamps;
-    if (barberId && user.loyaltyStampsMap) {
-      stamps = user.loyaltyStampsMap.get(barberId.toString()) || 0;
+    let activeBarber = null;
+    if (user.role === 'user') {
+      if (!barberSlug) {
+        return res.status(400).json({ error: 'Sartarosh kodi (login) majburiy' });
+      }
+      const barber = await User.findOne({ role: 'admin', slug: barberSlug.toLowerCase(), status: 'active' });
+      if (!barber) {
+        return res.status(400).json({ error: 'Sartarosh kodi noto\'g\'ri yoki sartarosh faol emas' });
+      }
+      activeBarber = {
+        _id: barber._id,
+        name: barber.name,
+        slug: barber.slug,
+        shopName: barber.shopName,
+        avatar: barber.avatar
+      };
     }
 
-    return res.json({
+    const token = generateToken(user._id);
+    let stamps = user.loyaltyStamps;
+    const targetBarberId = activeBarber?._id || req.headers['x-barber-id'];
+    if (targetBarberId && user.loyaltyStampsMap) {
+      stamps = user.loyaltyStampsMap.get(targetBarberId.toString()) || 0;
+    }
+
+    const responseData = {
       token,
       user: {
         id: user._id,
@@ -141,7 +171,13 @@ router.post('/login', async (req, res) => {
         status: user.status,
         loyaltyStamps: stamps
       }
-    });
+    };
+
+    if (activeBarber) {
+      responseData.activeBarber = activeBarber;
+    }
+
+    return res.json(responseData);
 
   } catch (error) {
     console.error('Login error:', error);
