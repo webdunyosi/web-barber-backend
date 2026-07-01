@@ -90,7 +90,8 @@ router.post('/register', async (req, res) => {
         telegram: newUser.telegram,
         role: newUser.role,
         status: newUser.status,
-        loyaltyStamps: stamps
+        loyaltyStamps: stamps,
+        slug: newUser.slug
       },
       activeBarber: {
         _id: barber._id,
@@ -169,7 +170,8 @@ router.post('/login', async (req, res) => {
         telegram: user.telegram,
         role: user.role,
         status: user.status,
-        loyaltyStamps: stamps
+        loyaltyStamps: stamps,
+        slug: user.slug
       }
     };
 
@@ -196,7 +198,8 @@ router.get('/me', requireAuth, async (req, res) => {
       telegram: req.user.telegram,
       role: req.user.role,
       status: req.user.status,
-      loyaltyStamps: req.user.loyaltyStamps
+      loyaltyStamps: req.user.loyaltyStamps,
+      slug: req.user.slug
     });
   } catch (error) {
     console.error('Get profile error:', error);
@@ -207,7 +210,7 @@ router.get('/me', requireAuth, async (req, res) => {
 // 4. PUT /api/auth/profile (Update Profile)
 router.put('/profile', requireAuth, async (req, res) => {
   try {
-    const { name, phone, telegram, password } = req.body;
+    const { name, phone, telegram, password, slug } = req.body;
 
     if (!name || name.trim() === '') {
       return res.status(400).json({ error: 'Ism kiritilishi majburiy' });
@@ -246,6 +249,22 @@ router.put('/profile', requireAuth, async (req, res) => {
     user.name = name.trim();
     user.telegram = cleanTelegram;
 
+    // Update slug if user is admin/superadmin
+    if (slug !== undefined && (user.role === 'admin' || user.role === 'superadmin')) {
+      const cleanSlug = slug.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
+      if (cleanSlug === '') {
+        return res.status(400).json({ error: 'Sartarosh kodi bo\'sh bo\'lishi mumkin emas' });
+      }
+      if (cleanSlug !== user.slug) {
+        // Verify unique slug
+        const existingSlug = await User.findOne({ slug: cleanSlug });
+        if (existingSlug) {
+          return res.status(400).json({ error: 'Bu sartarosh kodi allaqachon band' });
+        }
+        user.slug = cleanSlug;
+      }
+    }
+
     // Update password if provided
     if (password && password.trim() !== '') {
       if (password.length < 4) {
@@ -264,7 +283,8 @@ router.put('/profile', requireAuth, async (req, res) => {
       telegram: user.telegram,
       role: user.role,
       status: user.status,
-      loyaltyStamps: user.loyaltyStamps
+      loyaltyStamps: user.loyaltyStamps,
+      slug: user.slug
     });
   } catch (error) {
     console.error('Update profile error:', error);
