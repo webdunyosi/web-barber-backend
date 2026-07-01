@@ -88,20 +88,44 @@ async function seedAdminUser() {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash('admin', salt);
       const adminUser = new User({
-        name: 'Alimardon (Admin)',
+        name: 'Behruz',
         phone: '+998 99 999 99 99',
-        telegram: '',
+        telegram: 'webbarber',
+        instagram: 'webbarber',
+        facebook: 'webbarber',
+        youtube: 'webbarber',
         password: hashedPassword,
         role: 'admin',
         status: 'active',
         slug: 'alimardon',
         shopName: 'Alimardon Barber Shop',
-        description: 'Toshkentdagi eng sifatli sartaroshxona'
+        avatar: '/barber/1.png',
+        description: "Men 15 yildan beri sartaroshlik sohasida faoliyat yuritaman. Har bir mijozga professional yondashuv va sifatli xizmat ko'rsatish mening asosiy maqsadim. Zamonaviy va klassik stillarni birlashtirish orqali har bir mijozga o'ziga mos bo'lgan uslubni topib beraman.",
+        experienceStartYear: 2011,
+        experienceYears: 15
       });
       await adminUser.save();
       console.log('👑 Admin user seeded successfully: +998 99 999 99 99 / admin (slug: alimardon)');
     } else {
-      console.log('👑 Admin user already exists.');
+      let modified = false;
+      if (!adminExists.instagram) { adminExists.instagram = 'webbarber'; modified = true; }
+      if (!adminExists.facebook) { adminExists.facebook = 'webbarber'; modified = true; }
+      if (!adminExists.youtube) { adminExists.youtube = 'webbarber'; modified = true; }
+      if (!adminExists.telegram) { adminExists.telegram = 'webbarber'; modified = true; }
+      if (adminExists.experienceStartYear !== 2011) { adminExists.experienceStartYear = 2011; modified = true; }
+      if (adminExists.experienceYears !== 15) { adminExists.experienceYears = 15; modified = true; }
+      if (adminExists.avatar === '/avatar/men.png') { adminExists.avatar = '/barber/1.png'; modified = true; }
+      if (adminExists.name === 'Alimardon (Admin)') { adminExists.name = 'Behruz'; modified = true; }
+      if (adminExists.description === 'Toshkentdagi eng sifatli sartaroshxona') {
+        adminExists.description = "Men 15 yildan beri sartaroshlik sohasida faoliyat yuritaman. Har bir mijozga professional yondashuv va sifatli xizmat ko'rsatish mening asosiy maqsadim. Zamonaviy va klassik stillarni birlashtirish orqali har bir mijozga o'ziga mos bo'lgan uslubni topib beraman.";
+        modified = true;
+      }
+      if (modified) {
+        await adminExists.save();
+        console.log('👑 Admin user fields updated successfully.');
+      } else {
+        console.log('👑 Admin user already exists.');
+      }
     }
   } catch (error) {
     console.error('❌ Error seeding admin user:', error.message);

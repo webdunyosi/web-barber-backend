@@ -41,7 +41,7 @@ router.get('/barbers', async (req, res) => {
 // 2. POST /api/superadmin/barbers (Register new barber)
 router.post('/barbers', async (req, res) => {
   try {
-    const { name, phone, password, slug, shopName, description, telegram } = req.body;
+    const { name, phone, password, slug, shopName, title, description, telegram, instagram, facebook, youtube, experienceStartYear, experienceYears } = req.body;
 
     if (!name || !phone || !password || !slug || !shopName) {
       return res.status(400).json({ error: 'Ism, telefon, parol, slug va salon nomi kiritilishi majburiy' });
@@ -83,8 +83,14 @@ router.post('/barbers', async (req, res) => {
       status: 'active',
       slug: cleanSlug,
       shopName: shopName.trim(),
+      title: (title || 'Professional Barber').trim(),
       description: (description || '').trim(),
-      telegram: cleanTelegram
+      telegram: cleanTelegram,
+      instagram: (instagram || '').trim(),
+      facebook: (facebook || '').trim(),
+      youtube: (youtube || '').trim(),
+      experienceStartYear: Number(experienceStartYear) || 2011,
+      experienceYears: Number(experienceYears) || 15
     });
 
     await newBarber.save();
@@ -103,8 +109,14 @@ router.post('/barbers', async (req, res) => {
       phone: newBarber.phone,
       slug: newBarber.slug,
       shopName: newBarber.shopName,
+      title: newBarber.title,
       description: newBarber.description,
       telegram: newBarber.telegram,
+      instagram: newBarber.instagram,
+      facebook: newBarber.facebook,
+      youtube: newBarber.youtube,
+      experienceStartYear: newBarber.experienceStartYear,
+      experienceYears: newBarber.experienceYears,
       status: newBarber.status
     });
 
@@ -118,7 +130,7 @@ router.post('/barbers', async (req, res) => {
 router.put('/barbers/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone, password, slug, shopName, description, telegram, status } = req.body;
+    const { name, phone, password, slug, shopName, title, description, telegram, instagram, facebook, youtube, experienceStartYear, experienceYears, status } = req.body;
 
     const barber = await User.findById(id);
     if (!barber || barber.role !== 'admin') {
@@ -145,6 +157,7 @@ router.put('/barbers/:id', async (req, res) => {
 
     if (name !== undefined) barber.name = name.trim();
     if (shopName !== undefined) barber.shopName = shopName.trim();
+    if (title !== undefined) barber.title = title.trim();
     if (description !== undefined) barber.description = description.trim();
     if (status !== undefined) barber.status = status;
 
@@ -155,6 +168,12 @@ router.put('/barbers/:id', async (req, res) => {
       }
       barber.telegram = cleanTelegram;
     }
+
+    if (instagram !== undefined) barber.instagram = instagram.trim();
+    if (facebook !== undefined) barber.facebook = facebook.trim();
+    if (youtube !== undefined) barber.youtube = youtube.trim();
+    if (experienceStartYear !== undefined) barber.experienceStartYear = Number(experienceStartYear) || 2011;
+    if (experienceYears !== undefined) barber.experienceYears = Number(experienceYears) || 15;
 
     if (password && password.trim() !== '') {
       const salt = await bcrypt.genSalt(10);
@@ -169,8 +188,14 @@ router.put('/barbers/:id', async (req, res) => {
       phone: barber.phone,
       slug: barber.slug,
       shopName: barber.shopName,
+      title: barber.title,
       description: barber.description,
       telegram: barber.telegram,
+      instagram: barber.instagram,
+      facebook: barber.facebook,
+      youtube: barber.youtube,
+      experienceStartYear: barber.experienceStartYear,
+      experienceYears: barber.experienceYears,
       status: barber.status
     });
 

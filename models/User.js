@@ -16,8 +16,14 @@ const UserSchema = new mongoose.Schema({
   // SaaS fields for Barbers
   slug: { type: String, unique: true, sparse: true },
   shopName: { type: String, default: '' },
+  title: { type: String, default: 'Professional Barber' },
   description: { type: String, default: '' },
   avatar: { type: String, default: '/avatar/men.png' },
+  instagram: { type: String, default: '' },
+  facebook: { type: String, default: '' },
+  youtube: { type: String, default: '' },
+  experienceStartYear: { type: Number, default: 2011 },
+  experienceYears: { type: Number, default: 15 },
   subscriptionExpiresAt: { type: Date }
 }, { timestamps: true });
 

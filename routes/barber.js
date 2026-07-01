@@ -20,7 +20,7 @@ router.get('/info/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
     const barber = await User.findOne({ role: 'admin', slug: slug.toLowerCase(), status: 'active' })
-      .select('_id name slug shopName description avatar phone telegram');
+      .select('_id name slug shopName title description avatar phone telegram instagram facebook youtube experienceStartYear experienceYears');
 
     if (!barber) {
       return res.status(404).json({ error: 'Sartarosh topilmadi' });

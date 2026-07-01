@@ -98,7 +98,16 @@ router.post('/register', async (req, res) => {
         name: barber.name,
         slug: barber.slug,
         shopName: barber.shopName,
-        avatar: barber.avatar
+        title: barber.title,
+        description: barber.description,
+        avatar: barber.avatar,
+        phone: barber.phone,
+        telegram: barber.telegram,
+        instagram: barber.instagram,
+        facebook: barber.facebook,
+        youtube: barber.youtube,
+        experienceStartYear: barber.experienceStartYear,
+        experienceYears: barber.experienceYears
       }
     });
 
@@ -150,7 +159,16 @@ router.post('/login', async (req, res) => {
         name: barber.name,
         slug: barber.slug,
         shopName: barber.shopName,
-        avatar: barber.avatar
+        title: barber.title,
+        description: barber.description,
+        avatar: barber.avatar,
+        phone: barber.phone,
+        telegram: barber.telegram,
+        instagram: barber.instagram,
+        facebook: barber.facebook,
+        youtube: barber.youtube,
+        experienceStartYear: barber.experienceStartYear,
+        experienceYears: barber.experienceYears
       };
     }
 
@@ -265,6 +283,20 @@ router.put('/profile', requireAuth, async (req, res) => {
       }
     }
 
+    // Update SaaS fields for Barbers
+    if (user.role === 'admin' || user.role === 'superadmin') {
+      const { shopName, title, description, avatar, instagram, facebook, youtube, experienceStartYear, experienceYears } = req.body;
+      if (shopName !== undefined) user.shopName = shopName.trim();
+      if (title !== undefined) user.title = title.trim();
+      if (description !== undefined) user.description = description.trim();
+      if (avatar !== undefined) user.avatar = avatar.trim();
+      if (instagram !== undefined) user.instagram = instagram.trim();
+      if (facebook !== undefined) user.facebook = facebook.trim();
+      if (youtube !== undefined) user.youtube = youtube.trim();
+      if (experienceStartYear !== undefined) user.experienceStartYear = Number(experienceStartYear) || 2011;
+      if (experienceYears !== undefined) user.experienceYears = Number(experienceYears) || 15;
+    }
+
     // Update password if provided
     if (password && password.trim() !== '') {
       if (password.length < 4) {
@@ -284,7 +316,16 @@ router.put('/profile', requireAuth, async (req, res) => {
       role: user.role,
       status: user.status,
       loyaltyStamps: user.loyaltyStamps,
-      slug: user.slug
+      slug: user.slug,
+      shopName: user.shopName,
+      title: user.title,
+      description: user.description,
+      avatar: user.avatar,
+      instagram: user.instagram,
+      facebook: user.facebook,
+      youtube: user.youtube,
+      experienceStartYear: user.experienceStartYear,
+      experienceYears: user.experienceYears
     });
   } catch (error) {
     console.error('Update profile error:', error);
