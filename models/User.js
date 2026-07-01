@@ -17,7 +17,8 @@ const UserSchema = new mongoose.Schema({
   slug: { type: String, unique: true, sparse: true },
   shopName: { type: String, default: '' },
   description: { type: String, default: '' },
-  avatar: { type: String, default: '/avatar/men.png' }
+  avatar: { type: String, default: '/avatar/men.png' },
+  subscriptionExpiresAt: { type: Date }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);

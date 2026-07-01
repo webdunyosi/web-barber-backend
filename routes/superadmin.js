@@ -6,6 +6,7 @@ const Appointment = require('../models/Appointment');
 const BlockedSchedule = require('../models/BlockedSchedule');
 const OfflineIncome = require('../models/OfflineIncome');
 const Notification = require('../models/Notification');
+const SubscriptionPayment = require('../models/SubscriptionPayment');
 const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
 
 const router = express.Router();
@@ -224,6 +225,104 @@ router.get('/stats', async (req, res) => {
     });
   } catch (error) {
     console.error('Superadmin stats error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// Recalculate barber's subscription expires at based on payments
+async function updateBarberSubscriptionStatus(barberId) {
+  const payments = await SubscriptionPayment.find({ barberId });
+  if (payments.length === 0) {
+    await User.findByIdAndUpdate(barberId, { subscriptionExpiresAt: null });
+    return;
+  }
+  const maxToDate = new Date(Math.max(...payments.map(p => new Date(p.toDate).getTime())));
+  await User.findByIdAndUpdate(barberId, { subscriptionExpiresAt: maxToDate });
+}
+
+// 6. GET /api/superadmin/payments (List all subscription payments)
+router.get('/payments', async (req, res) => {
+  try {
+    const payments = await SubscriptionPayment.find()
+      .populate('barberId', 'name phone slug shopName')
+      .sort({ createdAt: -1 });
+    return res.json(payments);
+  } catch (error) {
+    console.error('List payments error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// 7. POST /api/superadmin/payments (Create a new payment record)
+router.post('/payments', async (req, res) => {
+  try {
+    const { barberId, amount, monthsCount, fromDate, toDate, receiptUrl, notes } = req.body;
+
+    if (!barberId || !amount || !monthsCount || !fromDate || !toDate) {
+      return res.status(400).json({ error: 'Barcha majburiy maydonlarni to\'ldiring' });
+    }
+
+    const newPayment = new SubscriptionPayment({
+      barberId,
+      amount,
+      monthsCount,
+      fromDate: new Date(fromDate),
+      toDate: new Date(toDate),
+      receiptUrl,
+      notes
+    });
+
+    await newPayment.save();
+    await updateBarberSubscriptionStatus(barberId);
+
+    return res.status(201).json(newPayment);
+  } catch (error) {
+    console.error('Create payment error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// 8. PUT /api/superadmin/payments/:id (Update a payment record)
+router.put('/payments/:id', async (req, res) => {
+  try {
+    const { amount, monthsCount, fromDate, toDate, receiptUrl, notes } = req.body;
+    const payment = await SubscriptionPayment.findById(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ error: 'To\'lov topilmadi' });
+    }
+
+    payment.amount = amount ?? payment.amount;
+    payment.monthsCount = monthsCount ?? payment.monthsCount;
+    payment.fromDate = fromDate ? new Date(fromDate) : payment.fromDate;
+    payment.toDate = toDate ? new Date(toDate) : payment.toDate;
+    payment.receiptUrl = receiptUrl ?? payment.receiptUrl;
+    payment.notes = notes ?? payment.notes;
+
+    await payment.save();
+    await updateBarberSubscriptionStatus(payment.barberId);
+
+    return res.json(payment);
+  } catch (error) {
+    console.error('Update payment error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
+
+// 9. DELETE /api/superadmin/payments/:id (Delete a payment record)
+router.delete('/payments/:id', async (req, res) => {
+  try {
+    const payment = await SubscriptionPayment.findById(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ error: 'To\'lov topilmadi' });
+    }
+
+    const barberId = payment.barberId;
+    await SubscriptionPayment.findByIdAndDelete(req.params.id);
+    await updateBarberSubscriptionStatus(barberId);
+
+    return res.json({ message: 'To\'lov o\'chirildi' });
+  } catch (error) {
+    console.error('Delete payment error:', error);
     return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
   }
 });
