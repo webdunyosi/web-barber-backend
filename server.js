@@ -8,6 +8,7 @@ const bcrypt = require('bcryptjs');
 
 const User = require('./models/User');
 const Service = require('./models/Service');
+const { startAutoCancelJob } = require('./utils/autoCancelAppointments');
 
 const authRoutes = require('./routes/auth');
 const appointmentRoutes = require('./routes/appointments');
@@ -139,6 +140,7 @@ mongoose.connect(process.env.MONGODB_URI)
     await seedSuperAdminUser();
     await seedAdminUser();
     await seedServices();
+    startAutoCancelJob(); // O'tib ketgan buyurtmalarni avtomatik bekor qilish
   })
   .catch(err => console.error('❌ MongoDB ulanishda xato:', err));
 
