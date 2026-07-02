@@ -9,11 +9,27 @@ const BlockedSchedule = require('../models/BlockedSchedule');
 const Service = require('../models/Service');
 const { upload } = require('../config/storage');
 const { autoRejectPastAppointments } = require('../utils/appointmentHelper');
+const SubscriptionPayment = require('../models/SubscriptionPayment');
 
 const router = express.Router();
 
 // Apply auth and admin check middlewares to all endpoints in this router
 router.use(requireAuth, requireAdmin);
+
+// GET /api/admin/my-subscription (Get barber's own subscription info)
+router.get('/my-subscription', async (req, res) => {
+  try {
+    const barberId = req.user._id;
+    const payments = await SubscriptionPayment.find({ barberId }).sort({ createdAt: -1 });
+    return res.json({
+      subscriptionExpiresAt: req.user.subscriptionExpiresAt,
+      payments
+    });
+  } catch (error) {
+    console.error('Get my subscription error:', error);
+    return res.status(500).json({ error: 'Serverda xatolik yuz berdi' });
+  }
+});
 
 // 1. GET /api/admin/users (List Users)
 router.get('/users', async (req, res) => {

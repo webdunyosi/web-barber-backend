@@ -91,7 +91,8 @@ router.post('/register', async (req, res) => {
         role: newUser.role,
         status: newUser.status,
         loyaltyStamps: stamps,
-        slug: newUser.slug
+        slug: newUser.slug,
+        subscriptionExpiresAt: newUser.subscriptionExpiresAt
       },
       activeBarber: {
         _id: barber._id,
@@ -189,7 +190,8 @@ router.post('/login', async (req, res) => {
         role: user.role,
         status: user.status,
         loyaltyStamps: stamps,
-        slug: user.slug
+        slug: user.slug,
+        subscriptionExpiresAt: user.subscriptionExpiresAt
       }
     };
 
@@ -217,7 +219,8 @@ router.get('/me', requireAuth, async (req, res) => {
       role: req.user.role,
       status: req.user.status,
       loyaltyStamps: req.user.loyaltyStamps,
-      slug: req.user.slug
+      slug: req.user.slug,
+      subscriptionExpiresAt: req.user.subscriptionExpiresAt
     });
   } catch (error) {
     console.error('Get profile error:', error);
