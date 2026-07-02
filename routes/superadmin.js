@@ -30,7 +30,7 @@ function formatUzbekPhone(phone) {
 // 1. GET /api/superadmin/barbers (List all barbers)
 router.get('/barbers', async (req, res) => {
   try {
-    const barbers = await User.find({ role: 'admin' }).select('-password');
+    const barbers = await User.find({ role: 'barber' }).select('-password');
     return res.json(barbers);
   } catch (error) {
     console.error('List barbers error:', error);
@@ -79,7 +79,7 @@ router.post('/barbers', async (req, res) => {
       name: name.trim(),
       phone: formattedPhone,
       password: hashedPassword,
-      role: 'admin',
+      role: 'barber',
       status: 'active',
       slug: cleanSlug,
       shopName: shopName.trim(),
@@ -133,7 +133,7 @@ router.put('/barbers/:id', async (req, res) => {
     const { name, phone, password, slug, shopName, title, description, telegram, instagram, facebook, youtube, experienceStartYear, experienceYears, status } = req.body;
 
     const barber = await User.findById(id);
-    if (!barber || barber.role !== 'admin') {
+    if (!barber || barber.role !== 'barber') {
       return res.status(404).json({ error: 'Sartarosh topilmadi' });
     }
 

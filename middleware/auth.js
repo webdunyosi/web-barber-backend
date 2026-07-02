@@ -42,7 +42,7 @@ const requireAdmin = (req, res, next) => {
     return res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan' });
   }
 
-  if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+  if (req.user.role !== 'barber' && req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Sizda ushbu amalni bajarish uchun ruxsat yo\'q' });
   }
 
@@ -54,7 +54,7 @@ const requireSuperAdmin = (req, res, next) => {
     return res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan' });
   }
 
-  if (req.user.role !== 'superadmin') {
+  if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Sizda ushbu amalni bajarish uchun ruxsat yo\'q' });
   }
 

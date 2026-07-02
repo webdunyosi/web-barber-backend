@@ -41,7 +41,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Sartarosh kodi (login) majburiy' });
     }
 
-    const barber = await User.findOne({ role: 'admin', slug: barberSlug.toLowerCase(), status: 'active' });
+    const barber = await User.findOne({ role: 'barber', slug: barberSlug.toLowerCase(), status: 'active' });
     if (!barber) {
       return res.status(400).json({ error: 'Sartarosh kodi noto\'g\'ri yoki sartarosh faol emas' });
     }
@@ -151,7 +151,7 @@ router.post('/login', async (req, res) => {
       if (!barberSlug) {
         return res.status(400).json({ error: 'Sartarosh kodi (login) majburiy' });
       }
-      const barber = await User.findOne({ role: 'admin', slug: barberSlug.toLowerCase(), status: 'active' });
+      const barber = await User.findOne({ role: 'barber', slug: barberSlug.toLowerCase(), status: 'active' });
       if (!barber) {
         return res.status(400).json({ error: 'Sartarosh kodi noto\'g\'ri yoki sartarosh faol emas' });
       }
@@ -270,8 +270,8 @@ router.put('/profile', requireAuth, async (req, res) => {
     user.name = name.trim();
     user.telegram = cleanTelegram;
 
-    // Update slug if user is admin/superadmin
-    if (slug !== undefined && (user.role === 'admin' || user.role === 'superadmin')) {
+    // Update slug if user is barber/admin
+    if (slug !== undefined && (user.role === 'barber' || user.role === 'admin')) {
       const cleanSlug = slug.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
       if (cleanSlug === '') {
         return res.status(400).json({ error: 'Sartarosh kodi bo\'sh bo\'lishi mumkin emas' });
@@ -287,7 +287,7 @@ router.put('/profile', requireAuth, async (req, res) => {
     }
 
     // Update SaaS fields for Barbers
-    if (user.role === 'admin' || user.role === 'superadmin') {
+    if (user.role === 'barber' || user.role === 'admin') {
       const { shopName, title, description, avatar, instagram, facebook, youtube, experienceStartYear, experienceYears } = req.body;
       if (shopName !== undefined) user.shopName = shopName.trim();
       if (title !== undefined) user.title = title.trim();

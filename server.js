@@ -58,7 +58,7 @@ app.get('/api/services', async (req, res) => {
 // Super Admin User Seeding
 async function seedSuperAdminUser() {
   try {
-    const superAdminExists = await User.findOne({ role: 'superadmin' });
+    const superAdminExists = await User.findOne({ role: 'admin' });
     if (!superAdminExists) {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash('superadmin', salt);
@@ -67,7 +67,7 @@ async function seedSuperAdminUser() {
         phone: '+998 99 888 88 88',
         telegram: '',
         password: hashedPassword,
-        role: 'superadmin',
+        role: 'admin',
         status: 'active'
       });
       await superAdminUser.save();
@@ -83,7 +83,7 @@ async function seedSuperAdminUser() {
 // Admin User Seeding
 async function seedAdminUser() {
   try {
-    const adminExists = await User.findOne({ role: 'admin' });
+    const adminExists = await User.findOne({ role: 'barber' });
     if (!adminExists) {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash('admin', salt);
@@ -95,7 +95,7 @@ async function seedAdminUser() {
         facebook: 'webbarber',
         youtube: 'webbarber',
         password: hashedPassword,
-        role: 'admin',
+        role: 'barber',
         status: 'active',
         slug: 'alimardon',
         shopName: 'Alimardon Barber Shop',
